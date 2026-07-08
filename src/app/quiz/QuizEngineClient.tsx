@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/utils/supabase';
-import { UploadCloud, FileText, ArrowLeft, CheckCircle2, XCircle, Layers, BookOpen, ExternalLink, AlertTriangle } from 'lucide-react';
+import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
@@ -90,7 +90,6 @@ export function QuizEngineClient() {
   };
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
-    // FIXED: Point the worker to an external CDN to survive Vercel's production bundling steps
     if (!pdfjs.GlobalWorkerOptions.workerSrc) {
       pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
     }
@@ -129,7 +128,21 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text inside the document layers.");
       }
 
-      const systemPrompt = `You are an expert academic evaluator machine...`; 
+      const systemPrompt = `You are an expert academic evaluator machine. 
+Analyze the provided notes and generate an array of multiple-choice questions matching this JSON structure:
+{
+  "detectedTopicTitle": "Topic Title Here",
+  "questions": [
+    {
+      "id": 1,
+      "question": "Question text?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "answerIndex": 0,
+      "referenceQuote": "Exact quote from notes text",
+      "pageNumber": 1
+    }
+  ]
+}`;
       const userPrompt = `${systemPrompt}\n\nNotes text context data:\n${parsedTextContent.substring(0, 18000)}`;
 
       const response = await fetch(
@@ -137,7 +150,13 @@ export function QuizEngineClient() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: userPrompt }] }] })
+          body: JSON.stringify({ 
+            contents: [{ parts: [{ text: userPrompt }] }],
+            // FIXED: Force Gemini to output a clean JSON response object structure
+            generationConfig: {
+              responseMimeType: "application/json"
+            }
+          })
         }
       );
 
@@ -255,7 +274,7 @@ export function QuizEngineClient() {
           </CardHeader>
           <CardContent className="p-6 space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold font-mono tracking-wider text-slate-400 uppercase flex items-center gap-1"><Layers className="w-3 h-3 text-indigo-500" /> Assessment Size Length</label>
+              <label className="text-[10px] font-bold font-mono tracking-wider text-slate-400 uppercase flex items-center gap-1">Assessment Size Length</label>
               <div className="grid grid-cols-3 gap-3">
                 {[10, 20, 30].map((num) => (
                   <button key={num} type="button" onClick={() => setSessionLimit(num)} className={`h-10 text-xs font-mono font-bold rounded-xl border transition-all ${sessionLimit === num ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200'}`}>{num} Questions</button>
