@@ -20,7 +20,6 @@ interface GeneratedQuestion {
   pageNumber: number;
 }
 
-// Rename this function to QuizEngineClient
 export function QuizEngineClient() {
   const router = useRouter();
   const [username, setUsername] = useState('');
@@ -91,11 +90,9 @@ export function QuizEngineClient() {
   };
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
+    // FIXED: Point the worker to an external CDN to survive Vercel's production bundling steps
     if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-      pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-        'pdfjs-dist/build/pdf.worker.min.mjs',
-        import.meta.url
-      ).toString();
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
     }
 
     const arrayBuffer = await fileObject.arrayBuffer();
@@ -132,7 +129,7 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text inside the document layers.");
       }
 
-      const systemPrompt = `You are an expert academic evaluator machine...`; // Shortened for brevity
+      const systemPrompt = `You are an expert academic evaluator machine...`; 
       const userPrompt = `${systemPrompt}\n\nNotes text context data:\n${parsedTextContent.substring(0, 18000)}`;
 
       const response = await fetch(
@@ -220,7 +217,6 @@ export function QuizEngineClient() {
 
   return (
     <main className="p-6 max-w-3xl mx-auto space-y-6 antialiased relative">
-      {/* 🛡️ EXIT OVERLAY */}
       {showExitModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
           <Card className="w-full max-w-sm border-slate-200 shadow-2xl bg-white rounded-2xl p-6 text-center space-y-4">
