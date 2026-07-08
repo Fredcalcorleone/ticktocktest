@@ -152,9 +152,9 @@ Analyze the provided notes and generate an array of multiple-choice questions ma
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             contents: [{ parts: [{ text: userPrompt }] }],
-            // FIXED: Force Gemini to output a clean JSON response object structure
-            generationConfig: {
-              responseMimeType: "application/json"
+            // FIXED: Using correct snake_case variables for raw REST API integration
+            generation_config: {
+              response_mime_type: "application/json"
             }
           })
         }
