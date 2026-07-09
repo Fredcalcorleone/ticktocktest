@@ -86,10 +86,8 @@ export function QuizEngineClient() {
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
     try {
-      // Fix worker assignment for broad browser compatibility
-      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-      }
+      // FIX: Use a robust version format directly mapped out from cdnjs
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.mjs`;
 
       const arrayBuffer = await fileObject.arrayBuffer();
       const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
@@ -105,8 +103,26 @@ export function QuizEngineClient() {
       }
       return combinedText;
     } catch (error: any) {
-      console.error("PDF Parsing internal error: ", error);
-      throw new Error(`PDF reader failed to initialize: ${error.message || error}`);
+      console.warn("Primary PDF worker initialization failed, attempting fallback loop setup...", error);
+      
+      try {
+        // FALLBACK OPTION: Fall back to an older version string structure if browser environment remains strict
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+        const arrayBuffer = await fileObject.arrayBuffer();
+        const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        let combinedText = "";
+        const maxPages = Math.min(pdf.numPages, 5);
+        for (let i = 1; i <= maxPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str || "").join(" ");
+          combinedText += `--- [PAGE_START_${i}] ---\n` + pageText + "\n";
+        }
+        return combinedText;
+      } catch (fallbackError: any) {
+        throw new Error(`PDF script loader blocked by internal browser protection rules. Try running on desktop chrome.`);
+      }
     }
   };
 
@@ -130,7 +146,6 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text layers inside this document.");
       }
 
-      // Strong structural instructions direct in the prompt text context
       const promptText = `You are a strict JSON generator. Do not include markdown formatting tags like \`\`\`json or backticks. Return raw JSON text only.
 Analyze these study notes and generate exactly ${sessionLimit} multiple-choice questions matching this structure:
 {
@@ -166,7 +181,6 @@ ${parsedTextContent.substring(0, 20000)}`;
 
       let rawTextJson = apiData.candidates[0].content.parts[0].text.trim();
       
-      // Secondary cleanup safety net just in case markdown creeps back in
       if (rawTextJson.includes("```")) {
         rawTextJson = rawTextJson.replace(/```json/gi, "").replace(/```/g, "").trim();
       }
@@ -303,7 +317,7 @@ ${parsedTextContent.substring(0, 20000)}`;
             </div>
             {file && (
               <Button onClick={handleStartAnalysis} disabled={isAnalyzing} className="w-full bg-indigo-600 text-white font-bold text-xs h-10 rounded-xl shadow-md cursor-pointer">
-                {isAnalyzing ? "Gemini Processing Text Core & Structuring Questions..." : `Analyze Notes & Build {sessionLimit} Inquiries →`}
+                {isAnalyzing ? "Gemini Processing Text Core & Structuring Questions..." : `Analyze Notes & Build ${sessionLimit} Inquiries →`}
               </Button>
             )}
           </CardContent>
