@@ -152,7 +152,7 @@ Analyze the provided notes and generate an array of multiple-choice questions ma
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             contents: [{ parts: [{ text: userPrompt }] }],
-            // FIXED: Fully defined strict JSON responseSchema structure layout mapping
+            // FIXED: generationConfig wrapper must be strict camelCase
             generationConfig: {
               responseMimeType: "application/json",
               responseSchema: {
