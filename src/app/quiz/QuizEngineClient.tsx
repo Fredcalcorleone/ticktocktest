@@ -152,9 +152,31 @@ Analyze the provided notes and generate an array of multiple-choice questions ma
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             contents: [{ parts: [{ text: userPrompt }] }],
-            // FIXED: Using strict camelCase configuration fields required by the raw v1 API endpoint mapping rules
+            // FIXED: Fully defined strict JSON responseSchema structure layout mapping
             generationConfig: {
-              responseMimeType: "application/json"
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  detectedTopicTitle: { type: "STRING" },
+                  questions: {
+                    type: "ARRAY",
+                    items: {
+                      type: "OBJECT",
+                      properties: {
+                        id: { type: "INTEGER" },
+                        question: { type: "STRING" },
+                        options: { type: "ARRAY", items: { type: "STRING" } },
+                        answerIndex: { type: "INTEGER" },
+                        referenceQuote: { type: "STRING" },
+                        pageNumber: { type: "INTEGER" }
+                      },
+                      required: ["id", "question", "options", "answerIndex", "referenceQuote", "pageNumber"]
+                    }
+                  }
+                },
+                required: ["detectedTopicTitle", "questions"]
+              }
             }
           })
         }
