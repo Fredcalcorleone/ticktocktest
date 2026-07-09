@@ -9,6 +9,7 @@ import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
+// Safely import PDFJS
 import * as pdfjs from 'pdfjs-dist';
 
 interface GeneratedQuestion {
@@ -30,14 +31,12 @@ export function QuizEngineClient() {
   const [quizStarted, setQuizStarted] = useState(false);
   
   const [detectedTitle, setDetectedTitle] = useState('Custom PDF Study Guide');
-
   const [aiQuestions, setAiQuestions] = useState<GeneratedQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [quizFinished, setQuizFinished] = useState(false);
   const [savingLog, setSavingLog] = useState(false);
-
   const [showExitModal, setShowExitModal] = useState(false);
   const [pendingTargetUrl, setPendingTargetUrl] = useState('');
 
@@ -58,11 +57,8 @@ export function QuizEngineClient() {
         e.returnValue = "Are you sure you want to exit?";
       }
     };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [quizStarted, quizFinished]);
 
   const handleProtectedExit = (targetUrl: string) => {
@@ -83,29 +79,35 @@ export function QuizEngineClient() {
     if (e.target.files && e.target.files[0]) {
       const chosenFile = e.target.files[0];
       setFile(chosenFile);
-      
       if (fileUrl) URL.revokeObjectURL(fileUrl);
       setFileUrl(URL.createObjectURL(chosenFile));
     }
   };
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
-    if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
-    }
+    try {
+      // Fix worker assignment for broad browser compatibility
+      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+      }
 
-    const arrayBuffer = await fileObject.arrayBuffer();
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-    let combinedText = "";
-    
-    const maxPages = Math.min(pdf.numPages, 5);
-    for (let i = 1; i <= maxPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item: any) => (item as any).str).join(" ");
-      combinedText += `--- [PAGE_START_${i}] ---\n` + pageText + "\n";
+      const arrayBuffer = await fileObject.arrayBuffer();
+      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      let combinedText = "";
+      
+      const maxPages = Math.min(pdf.numPages, 5);
+      for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str || "").join(" ");
+        combinedText += `--- [PAGE_START_${i}] ---\n` + pageText + "\n";
+      }
+      return combinedText;
+    } catch (error: any) {
+      console.error("PDF Parsing internal error: ", error);
+      throw new Error(`PDF reader failed to initialize: ${error.message || error}`);
     }
-    return combinedText;
   };
 
   const handleStartAnalysis = async () => {
@@ -116,7 +118,7 @@ export function QuizEngineClient() {
 
     const geminiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!geminiKey) {
-      alert("Missing API Key! Please verify that NEXT_PUBLIC_GEMINI_API_KEY is defined inside your .env.local file.");
+      alert("Missing API Key!");
       return;
     }
 
@@ -125,25 +127,28 @@ export function QuizEngineClient() {
       const parsedTextContent = await extractTextFromPDF(file);
 
       if (!parsedTextContent.trim()) {
-        throw new Error("Could not find any readable text inside the document layers.");
+        throw new Error("Could not find any readable text layers inside this document.");
       }
 
-      const systemPrompt = `You are an expert academic evaluator machine. 
-Analyze the provided notes and generate an array of multiple-choice questions matching this JSON structure:
+      // Strong structural instructions direct in the prompt text context
+      const promptText = `You are a strict JSON generator. Do not include markdown formatting tags like \`\`\`json or backticks. Return raw JSON text only.
+Analyze these study notes and generate exactly ${sessionLimit} multiple-choice questions matching this structure:
 {
-  "detectedTopicTitle": "Topic Title Here",
+  "detectedTopicTitle": "Summarized Topic Name",
   "questions": [
     {
       "id": 1,
-      "question": "Question text?",
+      "question": "The question content string?",
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "answerIndex": 0,
-      "referenceQuote": "Exact quote from notes text",
+      "referenceQuote": "Exact quote from text",
       "pageNumber": 1
     }
   ]
-}`;
-      const userPrompt = `${systemPrompt}\n\nNotes text context data:\n${parsedTextContent.substring(0, 18000)}`;
+}
+
+Study notes data:
+${parsedTextContent.substring(0, 20000)}`;
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
@@ -151,56 +156,32 @@ Analyze the provided notes and generate an array of multiple-choice questions ma
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
-            contents: [{ parts: [{ text: userPrompt }] }],
-            // FIXED: generationConfig wrapper must be strict camelCase
-            generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: "OBJECT",
-                properties: {
-                  detectedTopicTitle: { type: "STRING" },
-                  questions: {
-                    type: "ARRAY",
-                    items: {
-                      type: "OBJECT",
-                      properties: {
-                        id: { type: "INTEGER" },
-                        question: { type: "STRING" },
-                        options: { type: "ARRAY", items: { type: "STRING" } },
-                        answerIndex: { type: "INTEGER" },
-                        referenceQuote: { type: "STRING" },
-                        pageNumber: { type: "INTEGER" }
-                      },
-                      required: ["id", "question", "options", "answerIndex", "referenceQuote", "pageNumber"]
-                    }
-                  }
-                },
-                required: ["detectedTopicTitle", "questions"]
-              }
-            }
+            contents: [{ parts: [{ text: promptText }] }]
           })
         }
       );
 
       const apiData = await response.json();
-      if (apiData.error) throw new Error(`Gemini Refusal: ${apiData.error.message}`);
+      if (apiData.error) throw new Error(`Gemini Error: ${apiData.error.message}`);
 
       let rawTextJson = apiData.candidates[0].content.parts[0].text.trim();
-      if (rawTextJson.startsWith("```")) {
-        rawTextJson = rawTextJson.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+      
+      // Secondary cleanup safety net just in case markdown creeps back in
+      if (rawTextJson.includes("```")) {
+        rawTextJson = rawTextJson.replace(/```json/gi, "").replace(/```/g, "").trim();
       }
 
       const cleanParsedResult = JSON.parse(rawTextJson);
       if (cleanParsedResult && cleanParsedResult.questions?.length > 0) {
         setDetectedTitle(cleanParsedResult.detectedTopicTitle || file.name.replace(".pdf", ""));
-        setAiQuestions(cleanParsedResult.questions);
+        setAiQuestions(cleanParsedResult.questions.slice(0, sessionLimit));
         setQuizStarted(true);
       } else {
-        throw new Error("Invalid question structure parsed out from JSON lines.");
+        throw new Error("Parsed JSON did not contain the questions array format.");
       }
     } catch (err: any) {
-      console.error("Gemini Engine Error: ", err);
-      alert(`AI Extraction Error: ${err.message || "Failed to process text content rows."}`);
+      console.error("Gemini processing error: ", err);
+      alert(`Extraction Error: ${err.message || "Failed to process document content."}`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -250,7 +231,7 @@ Analyze the provided notes and generate an array of multiple-choice questions ma
         updated_at: new Date().toISOString()
       });
     } catch (err) {
-      console.error("Failed to commit progress logs:", err);
+      console.error("Database save failed:", err);
     } finally {
       setSavingLog(false);
     }
@@ -322,7 +303,7 @@ Analyze the provided notes and generate an array of multiple-choice questions ma
             </div>
             {file && (
               <Button onClick={handleStartAnalysis} disabled={isAnalyzing} className="w-full bg-indigo-600 text-white font-bold text-xs h-10 rounded-xl shadow-md cursor-pointer">
-                {isAnalyzing ? "Gemini Processing Text Core & Structuring Questions..." : `Analyze Notes & Build ${sessionLimit} Inquiries →`}
+                {isAnalyzing ? "Gemini Processing Text Core & Structuring Questions..." : `Analyze Notes & Build {sessionLimit} Inquiries →`}
               </Button>
             )}
           </CardContent>
@@ -332,7 +313,7 @@ Analyze the provided notes and generate an array of multiple-choice questions ma
       {quizStarted && !quizFinished && (
         <Card className="border-slate-200/80 shadow-xl bg-white rounded-3xl p-6 space-y-6">
           <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2 text-slate-500 max-w-[70%]"><span className="text-[10px] font-mono font-bold uppercase tracking-tight text-indigo-600 truncate">📖 Discovered Subject: {detectedTitle}</span></div>
+            <div className="flex items-center gap-2 text-slate-500 max-w-[70%]"><span className="text-[10px] font-mono font-bold uppercase tracking-tight text-indigo-600 truncate">📖 Subject: {detectedTitle}</span></div>
             <div className="flex gap-3 text-[10px] font-mono font-bold shrink-0"><span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded">{currentQuestionIndex + 1} of {aiQuestions.length}</span><span className="text-emerald-600">Correct: {score}</span></div>
           </div>
           <h3 className="text-sm font-black text-slate-800 leading-relaxed tracking-tight">{aiQuestions[currentQuestionIndex]?.question}</h3>
@@ -356,12 +337,12 @@ Analyze the provided notes and generate an array of multiple-choice questions ma
           {selectedOption !== null && (
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/60 text-left space-y-3">
               <div className="space-y-1.5">
-                <span className="text-[10px] font-mono font-bold uppercase text-indigo-600 tracking-wider flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Source Document Context Reference</span>
-                <p className="text-xs font-medium text-slate-600 italic leading-relaxed">"{aiQuestions[currentQuestionIndex]?.referenceQuote || "Context reference verification details not extracted for this item step."}"</p>
+                <span className="text-[10px] font-mono font-bold uppercase text-indigo-600 tracking-wider flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Source Context Reference</span>
+                <p className="text-xs font-medium text-slate-600 italic leading-relaxed">"{aiQuestions[currentQuestionIndex]?.referenceQuote || "Context reference verification details not extracted."}"</p>
               </div>
               {fileUrl && aiQuestions[currentQuestionIndex]?.pageNumber && (
                 <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Location: Page {aiQuestions[currentQuestionIndex].pageNumber}</span>
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Page {aiQuestions[currentQuestionIndex].pageNumber}</span>
                   <a href={`${fileUrl}#page=${aiQuestions[currentQuestionIndex].pageNumber}`} target="_blank" rel="noopener noreferrer">
                     <Button type="button" variant="outline" className="h-7 text-[10px] font-bold font-mono tracking-tight bg-white rounded-lg border-slate-200 shadow-none px-2.5 gap-1 cursor-pointer">Open PDF Origin <ExternalLink className="w-3 h-3 text-slate-400" /></Button>
                   </a>
@@ -370,8 +351,8 @@ Analyze the provided notes and generate an array of multiple-choice questions ma
             </div>
           )}
           {selectedOption !== null && (
-            <Button onClick={handleNextQuestion} disabled={savingLog} className="w-full bg-slate-900 text-white font-bold text-xs h-10 rounded-xl mt-2 cursor-pointer">
-              {savingLog ? "Writing Telemetry Records..." : currentQuestionIndex + 1 === aiQuestions.length ? "Finish Assessment & Record History →" : "Next Question →"}
+            <Button onClick={handleNextQuestion} className="w-full bg-slate-900 text-white font-bold text-xs h-10 rounded-xl mt-2 cursor-pointer">
+              {currentQuestionIndex + 1 === aiQuestions.length ? "Finish Assessment & Record History →" : "Next Question →"}
             </Button>
           )}
         </Card>
@@ -382,13 +363,13 @@ Analyze the provided notes and generate an array of multiple-choice questions ma
           <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-500 mx-auto flex items-center justify-center text-xl shadow-inner">🎉</div>
           <div className="space-y-1">
             <h2 className="text-base font-black text-slate-900 tracking-tight">Assessment Record Committed</h2>
-            <p className="text-xs text-slate-400">Performance statistics safely updated into your workspace historical summary tracking charts.</p>
+            <p className="text-xs text-slate-400">Performance statistics safely updated into history metrics.</p>
           </div>
           <div className="py-4 bg-slate-50/60 rounded-2xl max-w-xs mx-auto border border-slate-100">
             <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wide">Target Topic</p>
             <p className="text-xs font-bold text-indigo-700 px-2 truncate mt-0.5">{detectedTitle}</p>
             <p className="text-3xl font-black text-slate-800 mt-2">{Math.round((score / aiQuestions.length) * 100)}%</p>
-            <p className="text-[10px] text-emerald-600 font-mono font-bold mt-1">({score} / {aiQuestions.length} Correct Responses)</p>
+            <p className="text-[10px] text-emerald-600 font-mono font-bold mt-1">({score} / {aiQuestions.length} Correct)</p>
           </div>
           <div className="flex gap-3 max-w-sm mx-auto pt-2">
             <Button onClick={() => { setQuizStarted(false); setQuizFinished(false); setCurrentQuestionIndex(0); setSelectedOption(null); setScore(0); setAiQuestions([]); }} className="w-1/2 bg-white border border-slate-200 text-slate-600 font-bold text-xs h-10 rounded-xl cursor-pointer">Test New File</Button>
