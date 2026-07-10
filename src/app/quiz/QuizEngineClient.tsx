@@ -9,8 +9,9 @@ import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-// Import PDFJS safely
+// 1. IMPORT PDFJS & SET LOCAL BUNDLED WORKER COMPATIBILITY
 import * as pdfjs from 'pdfjs-dist';
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
 interface GeneratedQuestion {
   id: number;
@@ -85,7 +86,7 @@ export function QuizEngineClient() {
   };
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
-    // 1. SAFARI MOBILE PATCH: Polyfill 'Promise.withResolvers' if the browser engine lacks it
+    // SAFARI MOBILE POLYFILLS PACK
     if (typeof Promise.withResolvers !== "function") {
       Promise.withResolvers = function withResolvers<T>() {
         let resolve!: (value: T | PromiseLike<T>) => void;
@@ -99,11 +100,6 @@ export function QuizEngineClient() {
     }
 
     try {
-      // 2. STABLE WORKER PATH: Fetch the exact 6.1.200 worker layer seamlessly from unpkg CDN
-      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@6.1.200/build/pdf.worker.min.mjs`;
-      }
-
       const arrayBuffer = await fileObject.arrayBuffer();
       const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
       const pdf = await loadingTask.promise;
