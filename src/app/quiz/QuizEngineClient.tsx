@@ -85,13 +85,23 @@ export function QuizEngineClient() {
   };
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
+    // 1. SAFARI MOBILE PATCH: Polyfill 'Promise.withResolvers' if the browser engine lacks it
+    if (typeof Promise.withResolvers !== "function") {
+      Promise.withResolvers = function withResolvers<T>() {
+        let resolve!: (value: T | PromiseLike<T>) => void;
+        let reject!: (reason?: any) => void;
+        const promise = new Promise<T>((res, rej) => {
+          resolve = res;
+          reject = rej;
+        });
+        return { promise, resolve, reject };
+      };
+    }
+
     try {
-      // FIX: Dynamically resolve worker location locally out of node_modules bundle safely
+      // 2. STABLE WORKER PATH: Route parsing script via cloud cdn matching your workspace version
       if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          'pdfjs-dist/build/pdf.worker.min.mjs',
-          import.meta.url
-        ).toString();
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
       }
 
       const arrayBuffer = await fileObject.arrayBuffer();
