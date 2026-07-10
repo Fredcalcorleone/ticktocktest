@@ -17,6 +17,14 @@ export const metadata: Metadata = {
   title: "MindSprint AI",
   description: "Dynamic AI Assessment & Competitive Leaderboard Engine",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "MindSprint AI",
+  },
+  icons: {
+    apple: "/icon-512.png", // Crisp high-res splash icon target for Apple device home screens
+  },
 };
 
 export default function RootLayout({
