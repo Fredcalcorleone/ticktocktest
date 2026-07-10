@@ -9,7 +9,7 @@ import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-// Safely import PDFJS
+// Import PDFJS safely
 import * as pdfjs from 'pdfjs-dist';
 
 interface GeneratedQuestion {
@@ -86,8 +86,13 @@ export function QuizEngineClient() {
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
     try {
-      // FIX: Use a robust version format directly mapped out from cdnjs
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.mjs`;
+      // FIX: Dynamically resolve worker location locally out of node_modules bundle safely
+      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.min.mjs',
+          import.meta.url
+        ).toString();
+      }
 
       const arrayBuffer = await fileObject.arrayBuffer();
       const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
@@ -103,26 +108,8 @@ export function QuizEngineClient() {
       }
       return combinedText;
     } catch (error: any) {
-      console.warn("Primary PDF worker initialization failed, attempting fallback loop setup...", error);
-      
-      try {
-        // FALLBACK OPTION: Fall back to an older version string structure if browser environment remains strict
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-        const arrayBuffer = await fileObject.arrayBuffer();
-        const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-        const pdf = await loadingTask.promise;
-        let combinedText = "";
-        const maxPages = Math.min(pdf.numPages, 5);
-        for (let i = 1; i <= maxPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items.map((item: any) => item.str || "").join(" ");
-          combinedText += `--- [PAGE_START_${i}] ---\n` + pageText + "\n";
-        }
-        return combinedText;
-      } catch (fallbackError: any) {
-        throw new Error(`PDF script loader blocked by internal browser protection rules. Try running on desktop chrome.`);
-      }
+      console.error("PDF Parsing internal error: ", error);
+      throw new Error(`PDF data parsing failed: ${error.message || error}`);
     }
   };
 
