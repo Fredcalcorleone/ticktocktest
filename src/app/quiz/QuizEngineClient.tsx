@@ -99,9 +99,9 @@ export function QuizEngineClient() {
     }
 
     try {
-      // 2. STABLE WORKER PATH: Route parsing script via cloud cdn matching your workspace version
+      // 2. STABLE WORKER PATH: Fetch the exact 6.1.200 worker layer seamlessly from unpkg CDN
       if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@6.1.200/build/pdf.worker.min.mjs`;
       }
 
       const arrayBuffer = await fileObject.arrayBuffer();
