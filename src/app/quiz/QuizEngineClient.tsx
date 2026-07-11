@@ -315,7 +315,7 @@ export function QuizEngineClient() {
             </div>
             {file && (
               <Button onClick={handleStartAnalysis} disabled={isAnalyzing} className="w-full bg-indigo-600 text-white font-bold text-xs h-10 rounded-xl shadow-md cursor-pointer">
-                {isAnalyzing ? "Gemini Processing Text Core & Structuring Questions..." : `Analyze Notes & Build ${sessionLimit} Inquiries →`}
+                {isAnalyzing ? "Processing your note..." : `Analyze Notes & Build ${sessionLimit} Inquiries →`}
               </Button>
             )}
           </CardContent>
