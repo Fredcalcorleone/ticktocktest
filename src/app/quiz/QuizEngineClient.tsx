@@ -99,7 +99,6 @@ export function QuizEngineClient() {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         
-        // OPTIMIZATION: Stripping extra spacing out immediately to preserve token size
         const pageText = textContent.items
           .map((item: any) => item.str || "")
           .join(" ")
@@ -134,7 +133,7 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text layers inside this document.");
       }
 
-      // OPTIMIZATION: Offload schema validation directly onto the Gemini compiler pipeline 
+      // FIXED: response_mime_type, response_schema, and UPPERCASE types for standard REST APIs
       const payloadBody = {
         contents: [{ 
           parts: [{ text: `Analyze this source material text and build exactly ${sessionLimit} questions.\nSource Material Content:\n${parsedTextContent.substring(0, 16000)}` }] 
@@ -143,22 +142,22 @@ export function QuizEngineClient() {
           parts: [{ text: "You are an expert academic evaluator. Analyze the provided reading notes text context, deduce a descriptive umbrella topic title name, and generate high-yield educational multiple choice quiz questions." }]
         },
         generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "object",
+          response_mime_type: "application/json",
+          response_schema: {
+            type: "OBJECT",
             properties: {
-              detectedTopicTitle: { type: "string" },
+              detectedTopicTitle: { type: "STRING" },
               questions: {
-                type: "array",
+                type: "ARRAY",
                 items: {
-                  type: "object",
+                  type: "OBJECT",
                   properties: {
-                    id: { type: "number" },
-                    question: { type: "string" },
-                    options: { type: "array", items: { type: "string" } },
-                    answerIndex: { type: "number" },
-                    referenceQuote: { type: "string" },
-                    pageNumber: { type: "number" }
+                    id: { type: "INTEGER" },
+                    question: { type: "STRING" },
+                    options: { type: "ARRAY", items: { type: "STRING" } },
+                    answerIndex: { type: "INTEGER" },
+                    referenceQuote: { type: "STRING" },
+                    pageNumber: { type: "INTEGER" }
                   },
                   required: ["id", "question", "options", "answerIndex", "referenceQuote", "pageNumber"]
                 }
@@ -375,7 +374,7 @@ export function QuizEngineClient() {
           <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-500 mx-auto flex items-center justify-center text-xl shadow-inner">🎉</div>
           <div className="space-y-1">
             <h2 className="text-base font-black text-slate-900 tracking-tight">Assessment Record Committed</h2>
-            <p className="text-xs text-slate-400">Performance statistics safely updated into history metrics.</p>
+            <p className="text-xs text-slate-400">Performance statistics updated</p>
           </div>
           <div className="py-4 bg-slate-50/60 rounded-2xl max-w-xs mx-auto border border-slate-100">
             <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wide">Target Topic</p>
