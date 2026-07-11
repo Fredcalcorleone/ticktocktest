@@ -133,7 +133,7 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text layers inside this document.");
       }
 
-      // FIXED: response_mime_type, response_schema, and UPPERCASE types for standard REST APIs
+      // FIXED: Used generation_config (snake_case) to resolve the REST validation block
       const payloadBody = {
         contents: [{ 
           parts: [{ text: `Analyze this source material text and build exactly ${sessionLimit} questions.\nSource Material Content:\n${parsedTextContent.substring(0, 16000)}` }] 
@@ -141,7 +141,7 @@ export function QuizEngineClient() {
         systemInstruction: {
           parts: [{ text: "You are an expert academic evaluator. Analyze the provided reading notes text context, deduce a descriptive umbrella topic title name, and generate high-yield educational multiple choice quiz questions." }]
         },
-        generationConfig: {
+        generation_config: {
           response_mime_type: "application/json",
           response_schema: {
             type: "OBJECT",
@@ -374,7 +374,7 @@ export function QuizEngineClient() {
           <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-500 mx-auto flex items-center justify-center text-xl shadow-inner">🎉</div>
           <div className="space-y-1">
             <h2 className="text-base font-black text-slate-900 tracking-tight">Assessment Record Committed</h2>
-            <p className="text-xs text-slate-400">Performance statistics updated</p>
+            <p className="text-xs text-slate-400">Performance statistics safely updated into history metrics.</p>
           </div>
           <div className="py-4 bg-slate-50/60 rounded-2xl max-w-xs mx-auto border border-slate-100">
             <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wide">Target Topic</p>
