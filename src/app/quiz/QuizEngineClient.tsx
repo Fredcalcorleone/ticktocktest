@@ -9,9 +9,8 @@ import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-// 1. IMPORT PDFJS & SET LOCAL BUNDLED WORKER COMPATIBILITY
+// 1. IMPORT MOBILE-COMPATIBLE VERSION CORE
 import * as pdfjs from 'pdfjs-dist';
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
 interface GeneratedQuestion {
   id: number;
@@ -86,20 +85,12 @@ export function QuizEngineClient() {
   };
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
-    // SAFARI MOBILE POLYFILLS PACK
-    if (typeof Promise.withResolvers !== "function") {
-      Promise.withResolvers = function withResolvers<T>() {
-        let resolve!: (value: T | PromiseLike<T>) => void;
-        let reject!: (reason?: any) => void;
-        const promise = new Promise<T>((res, rej) => {
-          resolve = res;
-          reject = rej;
-        });
-        return { promise, resolve, reject };
-      };
-    }
-
     try {
+      // 2. SET MATCHING DEPENDABLE CLOUD WORKER
+      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      }
+
       const arrayBuffer = await fileObject.arrayBuffer();
       const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
       const pdf = await loadingTask.promise;

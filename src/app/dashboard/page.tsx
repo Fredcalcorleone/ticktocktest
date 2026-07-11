@@ -109,8 +109,7 @@ export default function StudentDashboard() {
         <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden">
           <CardHeader className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight">Recent AI Evaluation Records</CardTitle>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Historic log rows triggered from text context extractions.</p>
+              <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight">Evaluation Records</CardTitle>
             </div>
           </CardHeader>
           
