@@ -9,7 +9,6 @@ import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-// 1. IMPORT MOBILE-COMPATIBLE VERSION CORE
 import * as pdfjs from 'pdfjs-dist';
 
 interface GeneratedQuestion {
@@ -86,7 +85,6 @@ export function QuizEngineClient() {
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
     try {
-      // 2. SET MATCHING DEPENDABLE CLOUD WORKER
       if (!pdfjs.GlobalWorkerOptions.workerSrc) {
         pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
       }
@@ -100,8 +98,14 @@ export function QuizEngineClient() {
       for (let i = 1; i <= maxPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str || "").join(" ");
-        combinedText += `--- [PAGE_START_${i}] ---\n` + pageText + "\n";
+        
+        // OPTIMIZATION: Stripping extra spacing out immediately to preserve token size
+        const pageText = textContent.items
+          .map((item: any) => item.str || "")
+          .join(" ")
+          .replace(/\s+/g, ' '); 
+
+        combinedText += `[P_${i}] ` + pageText + "\n";
       }
       return combinedText;
     } catch (error: any) {
@@ -130,52 +134,62 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text layers inside this document.");
       }
 
-      const promptText = `You are a strict JSON generator. Do not include markdown formatting tags like \`\`\`json or backticks. Return raw JSON text only.
-Analyze these study notes and generate exactly ${sessionLimit} multiple-choice questions matching this structure:
-{
-  "detectedTopicTitle": "Summarized Topic Name",
-  "questions": [
-    {
-      "id": 1,
-      "question": "The question content string?",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "answerIndex": 0,
-      "referenceQuote": "Exact quote from text",
-      "pageNumber": 1
-    }
-  ]
-}
-
-Study notes data:
-${parsedTextContent.substring(0, 20000)}`;
+      // OPTIMIZATION: Offload schema validation directly onto the Gemini compiler pipeline 
+      const payloadBody = {
+        contents: [{ 
+          parts: [{ text: `Analyze this source material text and build exactly ${sessionLimit} questions.\nSource Material Content:\n${parsedTextContent.substring(0, 16000)}` }] 
+        }],
+        systemInstruction: {
+          parts: [{ text: "You are an expert academic evaluator. Analyze the provided reading notes text context, deduce a descriptive umbrella topic title name, and generate high-yield educational multiple choice quiz questions." }]
+        },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "object",
+            properties: {
+              detectedTopicTitle: { type: "string" },
+              questions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "number" },
+                    question: { type: "string" },
+                    options: { type: "array", items: { type: "string" } },
+                    answerIndex: { type: "number" },
+                    referenceQuote: { type: "string" },
+                    pageNumber: { type: "number" }
+                  },
+                  required: ["id", "question", "options", "answerIndex", "referenceQuote", "pageNumber"]
+                }
+              }
+            },
+            required: ["detectedTopicTitle", "questions"]
+          }
+        }
+      };
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            contents: [{ parts: [{ text: promptText }] }]
-          })
+          body: JSON.stringify(payloadBody)
         }
       );
 
       const apiData = await response.json();
       if (apiData.error) throw new Error(`Gemini Error: ${apiData.error.message}`);
 
-      let rawTextJson = apiData.candidates[0].content.parts[0].text.trim();
-      
-      if (rawTextJson.includes("```")) {
-        rawTextJson = rawTextJson.replace(/```json/gi, "").replace(/```/g, "").trim();
-      }
-
+      const rawTextJson = apiData.candidates[0].content.parts[0].text.trim();
       const cleanParsedResult = JSON.parse(rawTextJson);
+
       if (cleanParsedResult && cleanParsedResult.questions?.length > 0) {
         setDetectedTitle(cleanParsedResult.detectedTopicTitle || file.name.replace(".pdf", ""));
         setAiQuestions(cleanParsedResult.questions.slice(0, sessionLimit));
         setQuizStarted(true);
       } else {
-        throw new Error("Parsed JSON did not contain the questions array format.");
+        throw new Error("Parsed response schema did not match required format.");
       }
     } catch (err: any) {
       console.error("Gemini processing error: ", err);
