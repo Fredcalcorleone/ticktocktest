@@ -11,6 +11,14 @@ import Image from 'next/image';
 
 import * as pdfjs from 'pdfjs-dist';
 
+// FIXED: Use standard production-safe local worker initialization method
+if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url
+  ).toString();
+}
+
 interface GeneratedQuestion {
   id: number;
   question: string;
@@ -85,9 +93,6 @@ export function QuizEngineClient() {
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
     try {
-      // FIXED: Dynamically bind the CDN worker version to match your installed version exactly
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
       const arrayBuffer = await fileObject.arrayBuffer();
       const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
       const pdf = await loadingTask.promise;
