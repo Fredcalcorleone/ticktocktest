@@ -7,13 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/utils/supabase';
 import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-// FIXED: Fixed the broken 'react---/image' typo to prevent Vercel build compilation crashes
 import Image from 'next/image';
 import * as pdfjs from 'pdfjs-dist';
 
-// FIXED: Using standard cdnjs endpoint for matching worker version 4.4.168
+// FIXED: Use the official unpkg production build distribution which handles global worker scope isolation correctly
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
 }
 
 interface GeneratedQuestion {
@@ -134,7 +133,6 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text layers inside this document.");
       }
 
-      // Explicit uniform snake_case mapping structure required by the REST endpoint syntax
       const payloadBody = {
         contents: [{ 
           parts: [{ text: `Analyze this source material text and build exactly ${sessionLimit} questions.\nSource Material Content:\n${parsedTextContent.substring(0, 16000)}` }] 
@@ -169,7 +167,6 @@ export function QuizEngineClient() {
         }
       };
 
-      // FIXED: Hardcoded the URL route explicitly to v1beta to enable system_instruction & response_schema support
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
         {
