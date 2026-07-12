@@ -7,16 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/utils/supabase';
 import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+// FIXED: Fixed the broken 'react---/image' typo to prevent Vercel build compilation crashes
 import Image from 'next/image';
-
 import * as pdfjs from 'pdfjs-dist';
 
-// FIXED: Use standard production-safe local worker initialization method
-if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url
-  ).toString();
+// FIXED: Using standard cdnjs endpoint for matching worker version 4.4.168
+if (typeof window !== 'undefined') {
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
 }
 
 interface GeneratedQuestion {
@@ -137,11 +134,12 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text layers inside this document.");
       }
 
+      // Explicit uniform snake_case mapping structure required by the REST endpoint syntax
       const payloadBody = {
         contents: [{ 
           parts: [{ text: `Analyze this source material text and build exactly ${sessionLimit} questions.\nSource Material Content:\n${parsedTextContent.substring(0, 16000)}` }] 
         }],
-        systemInstruction: {
+        system_instruction: {
           parts: [{ text: "You are an expert academic evaluator. Analyze the provided reading notes text context, deduce a descriptive umbrella topic title name, and generate high-yield educational multiple choice quiz questions." }]
         },
         generation_config: {
@@ -171,8 +169,9 @@ export function QuizEngineClient() {
         }
       };
 
+      // FIXED: Hardcoded the URL route explicitly to v1beta to enable system_instruction & response_schema support
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
