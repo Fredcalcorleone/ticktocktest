@@ -85,9 +85,8 @@ export function QuizEngineClient() {
 
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
     try {
-      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-      }
+      // FIXED: Dynamically bind the CDN worker version to match your installed version exactly
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
       const arrayBuffer = await fileObject.arrayBuffer();
       const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
@@ -100,7 +99,7 @@ export function QuizEngineClient() {
         const textContent = await page.getTextContent();
         
         const pageText = textContent.items
-          .map((item: any) => item.str || "")
+          .map((item: any) => item.str ?? "")
           .join(" ")
           .replace(/\s+/g, ' '); 
 
@@ -133,7 +132,6 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text layers inside this document.");
       }
 
-      // FIXED: Used generation_config (snake_case) to resolve the REST validation block
       const payloadBody = {
         contents: [{ 
           parts: [{ text: `Analyze this source material text and build exactly ${sessionLimit} questions.\nSource Material Content:\n${parsedTextContent.substring(0, 16000)}` }] 
