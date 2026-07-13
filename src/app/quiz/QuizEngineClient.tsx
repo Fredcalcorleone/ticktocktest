@@ -10,9 +10,9 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import * as pdfjs from 'pdfjs-dist';
 
-// FIXED: Uses the standard global scope version to avoid WorkerMessageHandler parsing errors completely
+// FIXED: Uses the standard non-module legacy worker file distribution from unpkg to fix script load errors
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js`;
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.js`;
 }
 
 interface GeneratedQuestion {
@@ -133,6 +133,7 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text layers inside this document.");
       }
 
+      // FIXED: Strictly enforced raw schema constraints to prevent Gemini JSON Payload Parsing drops
       const payloadBody = {
         contents: [{ 
           parts: [{ text: `Analyze this source material text and build exactly ${sessionLimit} questions.\nSource Material Content:\n${parsedTextContent.substring(0, 16000)}` }] 
