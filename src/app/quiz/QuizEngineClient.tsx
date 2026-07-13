@@ -8,12 +8,6 @@ import { supabase } from '@/utils/supabase';
 import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import * as pdfjs from 'pdfjs-dist';
-
-// FIXED: Sets an empty data URI to force PDF.js to fallback securely to standard thread processing
-if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = 'data:text/javascript;base64,ZXhwb3J0IGRlZmF1bHQge307';
-}
 
 interface GeneratedQuestion {
   id: number;
@@ -87,8 +81,14 @@ export function QuizEngineClient() {
     }
   };
 
+  // FIXED: Dynamically imports the standard package and maps a reliable CDN worker to avoid build errors
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
     try {
+      const pdfjs = await import('pdfjs-dist');
+      
+      // Explicitly sets a reliable matching CDN build worker route to completely handle browser parsing
+      pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+
       const arrayBuffer = await fileObject.arrayBuffer();
       const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
       const pdf = await loadingTask.promise;
@@ -192,7 +192,7 @@ export function QuizEngineClient() {
     } catch (err: any) {
       console.error("Gemini processing error: ", err);
       alert(`Extraction Error: ${err.message || "Failed to process document content."}`);
-    } finally {
+    } fillal: {
       setIsAnalyzing(false);
     }
   };
