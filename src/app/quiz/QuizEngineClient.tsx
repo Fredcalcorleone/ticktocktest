@@ -81,36 +81,53 @@ export function QuizEngineClient() {
     }
   };
 
-  // FIXED: Dynamically imports the standard package and maps a reliable CDN worker to avoid build errors
+  // RESTORED: Native browser extraction loop. Bypasses external worker libraries entirely.
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
-    try {
-      const pdfjs = await import('pdfjs-dist');
-      
-      // Explicitly sets a reliable matching CDN build worker route to completely handle browser parsing
-      pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const buffer = reader.result as ArrayBuffer;
+          const arr = new Uint8Array(buffer);
+          let rawString = "";
+          
+          // Chunk-read execution blocks to prevent call stack sizing threshold overloads
+          const chunkSize = 65534;
+          for (let i = 0; i < arr.length; i += chunkSize) {
+            rawString += String.fromCharCode.apply(null, Array.from(arr.subarray(i, i + chunkSize)));
+          }
 
-      const arrayBuffer = await fileObject.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
-      let combinedText = "";
-      
-      const maxPages = Math.min(pdf.numPages, 5);
-      for (let i = 1; i <= maxPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        
-        const pageText = textContent.items
-          .map((item: any) => item.str ?? "")
-          .join(" ")
-          .replace(/\s+/g, ' '); 
+          // Regex matching to parse literal structural text groupings out from base streams
+          const textMatches = rawString.match(/\(([^)]*)\)\s*Tj/g);
+          if (!textMatches) {
+            // Fallback second-pass pattern to ensure structural matching depth coverage
+            const alternativeMatches = rawString.match(/\[([^\]]*)\]\s*TJ/g);
+            if (!alternativeMatches) {
+              resolve(rawString.replace(/[^\x20-\x7E]/g, ' ').substring(0, 12000));
+              return;
+            }
+            let processedText = alternativeMatches
+              .map(v => v.replace(/[^\x20-\x7E]/g, ''))
+              .join(' ');
+            resolve(processedText.substring(0, 14000));
+            return;
+          }
 
-        combinedText += `[P_${i}] ` + pageText + "\n";
-      }
-      return combinedText;
-    } catch (error: any) {
-      console.error("PDF Parsing internal error: ", error);
-      throw new Error(`PDF data parsing failed: ${error.message || error}`);
-    }
+          let cleanedText = textMatches
+            .map(match => match.replace(/^\(|\)\s*Tj$/g, ''))
+            .join(' ')
+            .replace(/\\([\d]{3})/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)))
+            .replace(/\\(.)/g, '$1')
+            .replace(/[^\x20-\x7E]/g, ' ');
+
+          resolve(cleanedText.substring(0, 14000));
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(fileObject);
+    });
   };
 
   const handleStartAnalysis = async () => {
@@ -192,7 +209,7 @@ export function QuizEngineClient() {
     } catch (err: any) {
       console.error("Gemini processing error: ", err);
       alert(`Extraction Error: ${err.message || "Failed to process document content."}`);
-    } fillal: {
+    } finally {
       setIsAnalyzing(false);
     }
   };
