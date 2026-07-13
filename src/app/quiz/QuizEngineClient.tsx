@@ -81,7 +81,7 @@ export function QuizEngineClient() {
     }
   };
 
-  // RESTORED: Native browser extraction loop. Bypasses external worker libraries entirely.
+  // Uses a completely native browser extraction method with zero dependency on external scripts or workers
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -91,16 +91,13 @@ export function QuizEngineClient() {
           const arr = new Uint8Array(buffer);
           let rawString = "";
           
-          // Chunk-read execution blocks to prevent call stack sizing threshold overloads
           const chunkSize = 65534;
           for (let i = 0; i < arr.length; i += chunkSize) {
             rawString += String.fromCharCode.apply(null, Array.from(arr.subarray(i, i + chunkSize)));
           }
 
-          // Regex matching to parse literal structural text groupings out from base streams
           const textMatches = rawString.match(/\(([^)]*)\)\s*Tj/g);
           if (!textMatches) {
-            // Fallback second-pass pattern to ensure structural matching depth coverage
             const alternativeMatches = rawString.match(/\[([^\]]*)\]\s*TJ/g);
             if (!alternativeMatches) {
               resolve(rawString.replace(/[^\x20-\x7E]/g, ' ').substring(0, 12000));
