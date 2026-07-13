@@ -10,9 +10,9 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import * as pdfjs from 'pdfjs-dist';
 
-// FIXED: Uses the standard non-module legacy worker file distribution from unpkg to fix script load errors
+// FIXED: Sets an empty data URI to force PDF.js to fallback securely to standard thread processing
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.js`;
+  pdfjs.GlobalWorkerOptions.workerSrc = 'data:text/javascript;base64,ZXhwb3J0IGRlZmF1bHQge307';
 }
 
 interface GeneratedQuestion {
@@ -133,7 +133,6 @@ export function QuizEngineClient() {
         throw new Error("Could not find any readable text layers inside this document.");
       }
 
-      // FIXED: Strictly enforced raw schema constraints to prevent Gemini JSON Payload Parsing drops
       const payloadBody = {
         contents: [{ 
           parts: [{ text: `Analyze this source material text and build exactly ${sessionLimit} questions.\nSource Material Content:\n${parsedTextContent.substring(0, 16000)}` }] 
