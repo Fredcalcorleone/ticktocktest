@@ -81,51 +81,36 @@ export function QuizEngineClient() {
     }
   };
 
-  // WORKER REMOVED: Native client-side binary stream decoder.
-  // This bypasses external script loading, CDN networks, and background threads entirely.
+  // FIXED: Accurate text parsing that securely runs inline without needing an external worker script
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const buffer = reader.result as ArrayBuffer;
-          const arr = new Uint8Array(buffer);
-          let rawString = "";
-          
-          const chunkSize = 65534;
-          for (let i = 0; i < arr.length; i += chunkSize) {
-            rawString += String.fromCharCode.apply(null, Array.from(arr.subarray(i, i + chunkSize)));
-          }
+    try {
+      const pdfjs = await import('pdfjs-dist');
+      
+      // Use the standard embedded configuration option to ensure it doesn't try loading via CDN links
+      pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
-          const textMatches = rawString.match(/\(([^)]*)\)\s*Tj/g);
-          if (!textMatches) {
-            const alternativeMatches = rawString.match(/\[([^\]]*)\]\s*TJ/g);
-            if (!alternativeMatches) {
-              resolve(rawString.replace(/[^\x20-\x7E]/g, ' ').substring(0, 12000));
-              return;
-            }
-            let processedText = alternativeMatches
-              .map(v => v.replace(/[^\x20-\x7E]/g, ''))
-              .join(' ');
-            resolve(processedText.substring(0, 14000));
-            return;
-          }
+      const arrayBuffer = await fileObject.arrayBuffer();
+      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      let combinedText = "";
+      
+      const maxPages = Math.min(pdf.numPages, 10); // Extends page scan depth safely up to 10 pages
+      for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        
+        const pageText = textContent.items
+          .map((item: any) => item.str ?? "")
+          .join(" ")
+          .replace(/\s+/g, ' '); 
 
-          let cleanedText = textMatches
-            .map(match => match.replace(/^\(|\)\s*Tj$/g, ''))
-            .join(' ')
-            .replace(/\\([\d]{3})/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)))
-            .replace(/\\(.)/g, '$1')
-            .replace(/[^\x20-\x7E]/g, ' ');
-
-          resolve(cleanedText.substring(0, 14000));
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.onerror = () => reject(reader.error);
-      reader.readAsArrayBuffer(fileObject);
-    });
+        combinedText += `[Page ${i}] ${pageText}\n`;
+      }
+      return combinedText;
+    } catch (error: any) {
+      console.error("PDF Parsing internal error: ", error);
+      throw new Error(`PDF data parsing failed: ${error.message || error}`);
+    }
   };
 
   const handleStartAnalysis = async () => {
