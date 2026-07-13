@@ -81,7 +81,8 @@ export function QuizEngineClient() {
     }
   };
 
-  // Uses a completely native browser extraction method with zero dependency on external scripts or workers
+  // WORKER REMOVED: Native client-side binary stream decoder.
+  // This bypasses external script loading, CDN networks, and background threads entirely.
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
