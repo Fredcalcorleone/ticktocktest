@@ -81,20 +81,20 @@ export function QuizEngineClient() {
     }
   };
 
-  // FIXED: Accurate text parsing that securely runs inline without needing an external worker script
+  // FIXED: Accurate text parsing that targets the correct v4 .mjs worker pattern
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
     try {
       const pdfjs = await import('pdfjs-dist');
       
-      // Use the standard embedded configuration option to ensure it doesn't try loading via CDN links
-      pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+      // Points exactly to the correct modern .mjs worker distribution on cdnjs
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
 
       const arrayBuffer = await fileObject.arrayBuffer();
       const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
       const pdf = await loadingTask.promise;
       let combinedText = "";
       
-      const maxPages = Math.min(pdf.numPages, 10); // Extends page scan depth safely up to 10 pages
+      const maxPages = Math.min(pdf.numPages, 10);
       for (let i = 1; i <= maxPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
