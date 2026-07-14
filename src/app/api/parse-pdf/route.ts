@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readPdfText } from 'pdf-text-reader';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,10 +12,15 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
-    // Pure JS parsing—no native Node compilation headaches
-    const text = await readPdfText({ data: buffer });
+    // Inline require completely bypasses bundler checks and missing type errors
+    const pdfParser = require('pdf-parse');
+    const parsedData = await pdfParser(buffer);
     
-    return NextResponse.json({ text });
+    if (!parsedData || !parsedData.text) {
+      return NextResponse.json({ error: 'Failed to extract text from document layers' }, { status: 422 });
+    }
+    
+    return NextResponse.json({ text: parsedData.text });
   } catch (error: any) {
     console.error("Server-side PDF parsing failed:", error);
     return NextResponse.json(
