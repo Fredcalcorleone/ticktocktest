@@ -81,36 +81,36 @@ export function QuizEngineClient() {
     }
   };
 
-  // FIXED: Accurate text parsing that targets the correct v4 .mjs worker pattern
+  // RESTORED: Standard FileReader text stream extraction
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
-    try {
-      const pdfjs = await import('pdfjs-dist');
-      
-      // Points exactly to the correct modern .mjs worker distribution on cdnjs
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const result = reader.result as string;
+          
+          // Extracts literal strings within text parentheses '(' and ')' patterns
+          const textMatches = result.match(/\(([^)]+)\)/g);
+          if (!textMatches) {
+            resolve("Could not parse textual markers in file.");
+            return;
+          }
+          
+          const parsed = textMatches
+            .map(str => str.slice(1, -1))
+            .filter(str => str.length > 2)
+            .join(' ')
+            .replace(/\\([0-3][0-7][0-7])/g, "") // Cleans PDF specific octal characters
+            .substring(0, 15000); 
 
-      const arrayBuffer = await fileObject.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
-      let combinedText = "";
-      
-      const maxPages = Math.min(pdf.numPages, 10);
-      for (let i = 1; i <= maxPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        
-        const pageText = textContent.items
-          .map((item: any) => item.str ?? "")
-          .join(" ")
-          .replace(/\s+/g, ' '); 
-
-        combinedText += `[Page ${i}] ${pageText}\n`;
-      }
-      return combinedText;
-    } catch (error: any) {
-      console.error("PDF Parsing internal error: ", error);
-      throw new Error(`PDF data parsing failed: ${error.message || error}`);
-    }
+          resolve(parsed);
+        } catch (e) {
+          reject(e);
+        }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(fileObject);
+    });
   };
 
   const handleStartAnalysis = async () => {
