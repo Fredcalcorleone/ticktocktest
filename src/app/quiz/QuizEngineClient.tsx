@@ -81,36 +81,24 @@ export function QuizEngineClient() {
     }
   };
 
-  // RESTORED: Standard FileReader text stream extraction
+  // FIXED: Communicates with your secure backend /api/parse-pdf endpoint 
+  // to grab correct text content cleanly without browser worker crashes.
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const result = reader.result as string;
-          
-          // Extracts literal strings within text parentheses '(' and ')' patterns
-          const textMatches = result.match(/\(([^)]+)\)/g);
-          if (!textMatches) {
-            resolve("Could not parse textual markers in file.");
-            return;
-          }
-          
-          const parsed = textMatches
-            .map(str => str.slice(1, -1))
-            .filter(str => str.length > 2)
-            .join(' ')
-            .replace(/\\([0-3][0-7][0-7])/g, "") // Cleans PDF specific octal characters
-            .substring(0, 15000); 
+    const formData = new FormData();
+    formData.append('file', fileObject);
 
-          resolve(parsed);
-        } catch (e) {
-          reject(e);
-        }
-      };
-      reader.onerror = () => reject(reader.error);
-      reader.readAsText(fileObject);
+    const response = await fetch('/api/parse-pdf', {
+      method: 'POST',
+      body: formData,
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to extract text on server.');
+    }
+
+    const data = await response.json();
+    return data.text;
   };
 
   const handleStartAnalysis = async () => {
@@ -129,7 +117,7 @@ export function QuizEngineClient() {
       setIsAnalyzing(true);
       const parsedTextContent = await extractTextFromPDF(file);
 
-      if (!parsedTextContent.trim()) {
+      if (!parsedTextContent || !parsedTextContent.trim()) {
         throw new Error("Could not find any readable text layers inside this document.");
       }
 
