@@ -137,8 +137,9 @@ export function QuizEngineClient() {
         contents: [{ 
           parts: [{ text: `Analyze this source material text and build exactly ${sessionLimit} questions.\nSource Material Content:\n${parsedTextContent.substring(0, 16000)}` }] 
         }],
+        // UPDATED: This system instruction guarantees that Gemini returns the physical page index of the file
         system_instruction: {
-          parts: [{ text: "You are an expert academic evaluator. Analyze the provided reading notes text context, deduce a descriptive umbrella topic title name, and generate high-yield educational multiple choice quiz questions." }]
+          parts: [{ text: "You are an expert academic evaluator. Analyze the provided reading notes text context, deduce a descriptive umbrella topic title name, and generate high-yield educational multiple choice quiz questions. IMPORTANT: For the 'pageNumber' property of each question, identify the exact physical page sheet index of the PDF file where the reference quote is located (treating the very first cover sheet of the PDF as physical page 1), rather than the printed page number written on the bottom of the document." }]
         },
         generation_config: {
           response_mime_type: "application/json",
@@ -341,7 +342,7 @@ export function QuizEngineClient() {
               {fileUrl && aiQuestions[currentQuestionIndex]?.pageNumber && (
                 <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between">
                   <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Page {aiQuestions[currentQuestionIndex].pageNumber}</span>
-                  {/* FIXED: Creates a clean highlight search hash query using the first 5 words of the reference quote */}
+                  {/* Creates a clean highlight search hash query using the first 5 words of the reference quote */}
                   {(() => {
                     const cleanQuote = (aiQuestions[currentQuestionIndex]?.referenceQuote || "")
                       .replace(/["'“”‘’]/g, '') // Strip extra punctuation
