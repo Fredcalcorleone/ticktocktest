@@ -13,22 +13,31 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
-    // Wrap the event-driven pdf2json listener in a Promise
     const extractedText = await new Promise<string>((resolve, reject) => {
       const pdfParser = new (PDFParser as any)();
       
       pdfParser.on('pdfParser_dataError', (errData: any) => reject(errData.parserError));
       pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
-        // Parse raw text strings out of page layouts, decoding URL percentage variables safely
-        let rawText = '';
-        for (const page of pdfData.Pages) {
-          for (const textObj of page.Texts) {
-            for (const textToken of textObj.R) {
-              rawText += decodeURIComponent(textToken.T) + ' ';
+        let structuredText = '';
+        
+        // Loop through each page using its explicit index to retain absolute page structure
+        pdfData.Pages.forEach((page: any, pageIdx: number) => {
+          const absolutePageNumber = pageIdx + 1;
+          let pageText = '';
+
+          if (page.Texts && page.Texts.length > 0) {
+            for (const textObj of page.Texts) {
+              for (const textToken of textObj.R) {
+                pageText += decodeURIComponent(textToken.T) + ' ';
+              }
             }
           }
-        }
-        resolve(rawText);
+
+          // Append structured page delimiters to the text payload
+          structuredText += `--- START OF PDF PAGE SHEET ${absolutePageNumber} ---\n${pageText.trim()}\n\n`;
+        });
+
+        resolve(structuredText);
       });
 
       pdfParser.parseBuffer(buffer);

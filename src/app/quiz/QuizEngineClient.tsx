@@ -23,7 +23,7 @@ export function QuizEngineClient() {
   const [username, setUsername] = useState('');
   const [sessionLimit, setSessionLimit] = useState<number>(10);
   const [file, setFile] = useState<File | null>(null);
-  const [fileUrl, setFileUrl] = useState<string | null>(null); // Stores the public cloud PDF URL
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
   
@@ -73,7 +73,7 @@ export function QuizEngineClient() {
     if (e.target.files && e.target.files[0]) {
       const chosenFile = e.target.files[0];
       setFile(chosenFile);
-      setFileUrl(null); // Reset URL until generated during analysis upload
+      setFileUrl(null);
     }
   };
 
@@ -110,7 +110,6 @@ export function QuizEngineClient() {
     try {
       setIsAnalyzing(true);
       
-      // 1. Upload to Supabase upfront to secure a live public HTTPS URL
       const fileExtension = file.name.split('.').pop();
       const uniqueFileName = `${username || 'learner'}-${Date.now()}.${fileExtension}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -121,12 +120,11 @@ export function QuizEngineClient() {
       if (!uploadError && uploadData) {
         const { data: publicUrlData } = supabase.storage.from('quiz-pdfs').getPublicUrl(uniqueFileName);
         publicPdfUrl = publicUrlData.publicUrl;
-        setFileUrl(publicPdfUrl); // Saved live URL
+        setFileUrl(publicPdfUrl);
       } else {
         throw new Error(uploadError?.message || "Failed to upload target PDF to media cloud.");
       }
 
-      // 2. Run background PDF parsing
       const parsedTextContent = await extractTextFromPDF(file);
 
       if (!parsedTextContent || !parsedTextContent.trim()) {
@@ -137,9 +135,8 @@ export function QuizEngineClient() {
         contents: [{ 
           parts: [{ text: `Analyze this source material text and build exactly ${sessionLimit} questions.\nSource Material Content:\n${parsedTextContent.substring(0, 16000)}` }] 
         }],
-        // FIXED: Explicitly instructs Gemini to match the custom boundary format sent from the API route
         system_instruction: {
-          parts: [{ text: "You are an expert academic evaluator. Analyze the provided reading notes text context, deduce a descriptive umbrella topic title name, and generate high-yield educational multiple choice quiz questions. IMPORTANT: The source text contains clear page markers formatted as '--- PAGE X ---'. For the 'pageNumber' value of every question, you must look at the nearest preceding PAGE marker containing the chosen referenceQuote and extract its absolute index number 'X'. Never guess or hallucinate page offsets." }]
+          parts: [{ text: "You are an expert academic evaluator. Analyze the provided reading notes text context, deduce a descriptive umbrella topic title name, and generate high-yield educational multiple choice quiz questions. IMPORTANT: The source text contains explicit page markers formatted as '--- START OF PDF PAGE SHEET X ---'. For the 'pageNumber' value of every question, you must find the '--- START OF PDF PAGE SHEET X ---' marker that immediately precedes the chosen 'referenceQuote', extract its exact integer value 'X', and save it to the pageNumber field. Never guess or approximate." }]
         },
         generation_config: {
           response_mime_type: "application/json",
@@ -226,7 +223,7 @@ export function QuizEngineClient() {
         module_name: `${detectedTitle.trim()}`,
         score: calculatedPercentage,
         status: 'completed',
-        pdf_url: fileUrl, // Already uploaded & saved!
+        pdf_url: fileUrl,
         updated_at: new Date().toISOString()
       });
     } catch (err) {
@@ -342,16 +339,16 @@ export function QuizEngineClient() {
               {fileUrl && aiQuestions[currentQuestionIndex]?.pageNumber && (
                 <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between">
                   <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Page {aiQuestions[currentQuestionIndex].pageNumber}</span>
-                  {/* Creates a clean highlight search hash query using the first 5 words of the reference quote */}
                   {(() => {
-                    const cleanQuote = (aiQuestions[currentQuestionIndex]?.referenceQuote || "")
-                      .replace(/["'“”‘’]/g, '') // Strip extra punctuation
+                    // Normalize the quote: remove quotes, double spaces, and strip down to a clean 3-4 word phrase
+                    // Long sentences break the Chrome PDF highlighting engine easily
+                    const words = (aiQuestions[currentQuestionIndex]?.referenceQuote || "")
+                      .replace(/["'“”‘’.,/#!$%^&*;:{}=\-_`~()]/g, '')
                       .trim()
-                      .split(/\s+/)
-                      .slice(0, 5) // Use a 5-word lookup boundary for highly stable highlights
-                      .join(' ');
+                      .split(/\s+/);
                     
-                    const targetHref = `${fileUrl}#page=${aiQuestions[currentQuestionIndex].pageNumber}&search="${encodeURIComponent(cleanQuote)}"`;
+                    const searchQuery = words.slice(0, Math.min(words.length, 4)).join(' ');
+                    const targetHref = `${fileUrl}#page=${aiQuestions[currentQuestionIndex].pageNumber}&search="${encodeURIComponent(searchQuery)}"`;
 
                     return (
                       <a href={targetHref} target="_blank" rel="noopener noreferrer">
