@@ -23,7 +23,7 @@ export function QuizEngineClient() {
   const [username, setUsername] = useState('');
   const [sessionLimit, setSessionLimit] = useState<number>(10);
   const [file, setFile] = useState<File | null>(null);
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null); // Stores the public cloud PDF URL
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
   
@@ -42,10 +42,7 @@ export function QuizEngineClient() {
       const cachedUser = localStorage.getItem('mindsprint_user');
       setUsername(cachedUser || 'Learner');
     }
-    return () => {
-      if (fileUrl) URL.revokeObjectURL(fileUrl);
-    };
-  }, [fileUrl]);
+  }, []);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -76,13 +73,10 @@ export function QuizEngineClient() {
     if (e.target.files && e.target.files[0]) {
       const chosenFile = e.target.files[0];
       setFile(chosenFile);
-      if (fileUrl) URL.revokeObjectURL(fileUrl);
-      setFileUrl(URL.createObjectURL(chosenFile));
+      setFileUrl(null); // Reset URL until generated during analysis upload
     }
   };
 
-  // FIXED: Communicates with your secure backend /api/parse-pdf endpoint 
-  // to grab correct text content cleanly without browser worker crashes.
   const extractTextFromPDF = async (fileObject: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', fileObject);
@@ -115,6 +109,24 @@ export function QuizEngineClient() {
 
     try {
       setIsAnalyzing(true);
+      
+      // 1. Upload to Supabase upfront to secure a live public HTTPS URL
+      const fileExtension = file.name.split('.').pop();
+      const uniqueFileName = `${username || 'learner'}-${Date.now()}.${fileExtension}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('quiz-pdfs')
+        .upload(uniqueFileName, file);
+
+      let publicPdfUrl = '';
+      if (!uploadError && uploadData) {
+        const { data: publicUrlData } = supabase.storage.from('quiz-pdfs').getPublicUrl(uniqueFileName);
+        publicPdfUrl = publicUrlData.publicUrl;
+        setFileUrl(publicPdfUrl); // Saved live URL
+      } else {
+        throw new Error(uploadError?.message || "Failed to upload target PDF to media cloud.");
+      }
+
+      // 2. Run background PDF parsing
       const parsedTextContent = await extractTextFromPDF(file);
 
       if (!parsedTextContent || !parsedTextContent.trim()) {
@@ -207,25 +219,13 @@ export function QuizEngineClient() {
     try {
       setSavingLog(true);
       const calculatedPercentage = Math.round((score / aiQuestions.length) * 100);
-      let uploadedPdfUrl = null;
-
-      if (file) {
-        const fileExtension = file.name.split('.').pop();
-        const uniqueFileName = `${username}-${Date.now()}.${fileExtension}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage.from('quiz-pdfs').upload(uniqueFileName, file);
-
-        if (!uploadError && uploadData) {
-          const { data: publicUrlData } = supabase.storage.from('quiz-pdfs').getPublicUrl(uniqueFileName);
-          uploadedPdfUrl = publicUrlData.publicUrl;
-        }
-      }
 
       await supabase.from('user_progress').insert({
         username: username,
         module_name: `${detectedTitle.trim()}`,
         score: calculatedPercentage,
         status: 'completed',
-        pdf_url: uploadedPdfUrl, 
+        pdf_url: fileUrl, // Already uploaded & saved!
         updated_at: new Date().toISOString()
       });
     } catch (err) {
@@ -301,7 +301,7 @@ export function QuizEngineClient() {
             </div>
             {file && (
               <Button onClick={handleStartAnalysis} disabled={isAnalyzing} className="w-full bg-indigo-600 text-white font-bold text-xs h-10 rounded-xl shadow-md cursor-pointer">
-                {isAnalyzing ? "Processing your note..." : `Analyze Notes & Build ${sessionLimit} Inquiries →`}
+                {isAnalyzing ? "Processing & Uploading..." : `Analyze Notes & Build ${sessionLimit} Inquiries →`}
               </Button>
             )}
           </CardContent>
@@ -341,8 +341,11 @@ export function QuizEngineClient() {
               {fileUrl && aiQuestions[currentQuestionIndex]?.pageNumber && (
                 <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between">
                   <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Page {aiQuestions[currentQuestionIndex].pageNumber}</span>
+                  {/* FIXED: Now links to public Supabase bucket file endpoint so page hash rules render cleanly */}
                   <a href={`${fileUrl}#page=${aiQuestions[currentQuestionIndex].pageNumber}`} target="_blank" rel="noopener noreferrer">
-                    <Button type="button" variant="outline" className="h-7 text-[10px] font-bold font-mono tracking-tight bg-white rounded-lg border-slate-200 shadow-none px-2.5 gap-1 cursor-pointer">Open PDF Origin <ExternalLink className="w-3 h-3 text-slate-400" /></Button>
+                    <Button type="button" variant="outline" className="h-7 text-[10px] font-bold font-mono tracking-tight bg-white rounded-lg border-slate-200 shadow-none px-2.5 gap-1 cursor-pointer">
+                      Open PDF Origin <ExternalLink className="w-3 h-3 text-slate-400" />
+                    </Button>
                   </a>
                 </div>
               )}
