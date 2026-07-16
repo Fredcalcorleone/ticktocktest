@@ -341,12 +341,25 @@ export function QuizEngineClient() {
               {fileUrl && aiQuestions[currentQuestionIndex]?.pageNumber && (
                 <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between">
                   <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Page {aiQuestions[currentQuestionIndex].pageNumber}</span>
-                  {/* FIXED: Now links to public Supabase bucket file endpoint so page hash rules render cleanly */}
-                  <a href={`${fileUrl}#page=${aiQuestions[currentQuestionIndex].pageNumber}`} target="_blank" rel="noopener noreferrer">
-                    <Button type="button" variant="outline" className="h-7 text-[10px] font-bold font-mono tracking-tight bg-white rounded-lg border-slate-200 shadow-none px-2.5 gap-1 cursor-pointer">
-                      Open PDF Origin <ExternalLink className="w-3 h-3 text-slate-400" />
-                    </Button>
-                  </a>
+                  {/* FIXED: Creates a clean highlight search hash query using the first 5 words of the reference quote */}
+                  {(() => {
+                    const cleanQuote = (aiQuestions[currentQuestionIndex]?.referenceQuote || "")
+                      .replace(/["'“”‘’]/g, '') // Strip extra punctuation
+                      .trim()
+                      .split(/\s+/)
+                      .slice(0, 5) // Use a 5-word lookup boundary for highly stable highlights
+                      .join(' ');
+                    
+                    const targetHref = `${fileUrl}#page=${aiQuestions[currentQuestionIndex].pageNumber}&search="${encodeURIComponent(cleanQuote)}"`;
+
+                    return (
+                      <a href={targetHref} target="_blank" rel="noopener noreferrer">
+                        <Button type="button" variant="outline" className="h-7 text-[10px] font-bold font-mono tracking-tight bg-white rounded-lg border-slate-200 shadow-none px-2.5 gap-1 cursor-pointer">
+                          Open PDF Origin <ExternalLink className="w-3 h-3 text-slate-400" />
+                        </Button>
+                      </a>
+                    );
+                  })()}
                 </div>
               )}
             </div>
