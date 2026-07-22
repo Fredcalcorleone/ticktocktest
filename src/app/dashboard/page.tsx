@@ -1,19 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from '@/utils/supabase';
-import { BrainCircuit, GraduationCap, CheckCircle2, BarChart3, Clock, ArrowRight, FileText } from 'lucide-react';
+import { BrainCircuit, GraduationCap, BarChart3, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 interface ProgressRow {
-  id: string;
-  module_name: string;
   score: number;
-  status: string;
-  pdf_url?: string;
-  updated_at: string;
 }
 
 export default function StudentDashboard() {
@@ -32,7 +27,7 @@ export default function StudentDashboard() {
     setUsername(cachedUser);
     fetchTelemetryData(cachedUser);
 
-    // Initialize Dark Mode setting baseline state sync
+    // Sync Dark Mode state baseline
     const isDark = localStorage.getItem('theme') === 'dark';
     if (isDark) document.documentElement.classList.add('dark');
   }, []);
@@ -42,9 +37,8 @@ export default function StudentDashboard() {
       setLoading(true);
       const { data, error } = await supabase
         .from('user_progress')
-        .select('*')
-        .eq('username', userKey)
-        .order('updated_at', { ascending: false });
+        .select('score')
+        .eq('username', userKey);
 
       if (error) throw error;
       if (data) setProgressData(data);
@@ -66,6 +60,8 @@ export default function StudentDashboard() {
         
         {/* CORE TELEMETRY STAT GRID */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+          
+          {/* Welcome & CTA Card */}
           <div className="md:col-span-2 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 flex flex-col justify-between shadow-lg shadow-indigo-950/10 relative overflow-hidden">
             <div className="absolute right-0 bottom-0 opacity-10 translate-x-4 translate-y-4 pointer-events-none">
               <GraduationCap className="w-64 h-64" />
@@ -86,9 +82,12 @@ export default function StudentDashboard() {
             </div>
           </div>
 
+          {/* Stat Summary Widget */}
           <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 p-5 flex flex-col justify-between">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-50 dark:border-slate-800">
-              <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center"><BarChart3 className="w-4 h-4" /></div>
+              <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center">
+                <BarChart3 className="w-4 h-4" />
+              </div>
               <span className="text-[15px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Performance Telemetry</span>
             </div>
             
@@ -105,80 +104,8 @@ export default function StudentDashboard() {
           </Card>
         </div>
 
-        {/* LOG DATA TABLE VIEW */}
-        <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden">
-          <CardHeader className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight">Evaluation Records</CardTitle>
-            </div>
-          </CardHeader>
-          
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="p-12 text-center text-xs text-slate-400 font-mono dark:text-slate-500">Syncing system database rows...</div>
-            ) : progressData.length === 0 ? (
-              <div className="p-12 text-center space-y-2">
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No telemetry log lines detected.</p>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500 max-w-xs mx-auto">Upload your first evaluation PDF notes packet using the Quiz Engine link to compile performance marks.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 text-[10px] font-mono font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider">
-                      <th className="py-3 px-6">Module / Topic Identifier</th>
-                      <th className="py-3 px-6">Acquired Grade</th>
-                      <th className="py-3 px-6">Execution Mark Status</th>
-                      <th className="py-3 px-6 text-center">Attachment</th>
-                      <th className="py-3 px-6 text-right">Committed Timestamp</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
-                    {progressData.map((row) => (
-                      <tr key={row.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/20 transition-colors">
-                        <td className="py-3.5 px-6 font-bold text-slate-900 dark:text-slate-100">{row.module_name}</td>
-                        <td className="py-3.5 px-6">
-                          <span className={`font-mono font-bold ${row.score >= 70 ? 'text-emerald-600' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                            {row.score}%
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-6">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md">
-                            <CheckCircle2 className="w-3 h-3" /> {row.status || 'completed'}
-                          </span>
-                        </td>
-                        
-                        <td className="py-3.5 px-6 text-center">
-                          {row.pdf_url ? (
-                            <a 
-                              href={row.pdf_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="inline-flex items-center gap-1 text-[10px] font-bold font-mono text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-lg px-2 py-0.5 transition-all cursor-pointer"
-                              title="Open source study material PDF in a new window tab"
-                            >
-                              <FileText className="w-3 h-3 text-slate-400 dark:text-slate-500" /> PDF
-                            </a>
-                          ) : (
-                            <span className="text-[10px] text-slate-300 dark:text-slate-600 font-mono italic select-none">—</span>
-                          )}
-                        </td>
-
-                        <td className="py-3.5 px-6 text-right text-slate-400 dark:text-slate-500 font-mono text-[11px]">
-                          <span className="inline-flex items-center gap-1 justify-end">
-                            <Clock className="w-3 h-3" /> {new Date(row.updated_at).toLocaleDateString()}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-4 font-medium tracking-wide relative text-center">
+        {/* Footer */}
+        <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-8 font-medium tracking-wide relative text-center">
           © 2026 MindSprint. Developed by Irfan Khalis. All rights reserved. Powered by the Gemini AI Engine to deliver real-time, intelligent assessment generation.
         </p>
 
