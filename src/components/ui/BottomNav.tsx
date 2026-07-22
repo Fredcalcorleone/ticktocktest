@@ -17,7 +17,8 @@ export function BottomNav() {
   ];
 
   return (
-    <div className="fixed bottom-6 inset-x-0 mx-auto w-[90%] max-w-md z-50 pointer-events-auto">
+    /* md:hidden ensures this ONLY appears on mobile screen sizes (< 768px) */
+    <div className="fixed bottom-6 inset-x-0 mx-auto w-[90%] max-w-md z-50 pointer-events-auto md:hidden">
       <div className="bg-white/80 backdrop-blur-xl border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.08)] rounded-full px-4 py-2 flex items-center justify-between">
         {navItems.map((item) => {
           const Icon = item.icon;
