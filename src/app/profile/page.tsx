@@ -151,7 +151,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Upload Avatar to Supabase Storage ('avatars' bucket)
+  // Upload Avatar to Supabase Storage ('avatars' bucket) - Option B (Auth UUID Restricted)
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -165,16 +165,26 @@ export default function ProfilePage() {
       setUploading(true);
       setStatusMessage(null);
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${username.toLowerCase()}_${Date.now()}.${fileExt}`;
-      const filePath = `profiles/${fileName}`;
+      // 1. Get authenticated user ID from Supabase
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
 
+      if (userError || !user) {
+        throw new Error('User session not found. Please log in again.');
+      }
+
+      // 2. Build file path using the user UUID
+      const fileExt = file.name.split('.').pop();
+      const fileName = `avatar_${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      // 3. Upload file to 'avatars' bucket
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
+      // 4. Retrieve public URL
       const { data: publicUrlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
