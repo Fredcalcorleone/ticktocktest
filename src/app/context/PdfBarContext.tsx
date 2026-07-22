@@ -20,11 +20,8 @@ const PdfBarContext = createContext<PdfBarContextType | undefined>(undefined);
 
 export function PdfBarProvider({ children }: { children: React.ReactNode }) {
   const [pdfData, setPdfData] = useState<PdfBarState>({
-    isVisible: true, // Set to true to verify UI rendering across pages
+    isVisible: false, // Reset to false so it stays hidden outside active quiz references
     label: 'Source Context',
-    pageNumber: 1,
-    referenceQuote: 'Sample reference quote preview for testing layout alignment.',
-    fileUrl: '#',
   });
 
   const showPdfBar = (data: Omit<PdfBarState, 'isVisible'>) => {
