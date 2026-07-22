@@ -8,6 +8,7 @@ import { supabase } from '@/utils/supabase';
 import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { MobilePdfBar } from '@/components/ui/MobilePdfBar';
 
 interface GeneratedQuestion {
   id: number;
@@ -340,10 +341,9 @@ export function QuizEngineClient() {
                 <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between">
                   <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Page {aiQuestions[currentQuestionIndex].pageNumber}</span>
                   {(() => {
-                    // Normalize the quote: remove quotes, double spaces, and strip down to a clean 3-4 word phrase
-                    // Long sentences break the Chrome PDF highlighting engine easily
-                    const words = (aiQuestions[currentQuestionIndex]?.referenceQuote || "")
-                      .replace(/["'“”‘’.,/#!$%^&*;:{}=\-_`~()]/g, '')
+                    const referenceQuote = aiQuestions[currentQuestionIndex]?.referenceQuote || "";
+                    const words = referenceQuote
+                      .replace(/[^\w\s]/g, '')
                       .trim()
                       .split(/\s+/);
                     
@@ -389,6 +389,15 @@ export function QuizEngineClient() {
           </div>
         </Card>
       )}
+
+      {/* Global Reusable Mobile Bottom Quick-Access Bar */}
+      <MobilePdfBar 
+        isVisible={selectedOption !== null && !quizFinished}
+        pageNumber={aiQuestions[currentQuestionIndex]?.pageNumber}
+        fileUrl={fileUrl}
+        referenceQuote={aiQuestions[currentQuestionIndex]?.referenceQuote}
+        label="Source Context"
+      />
     </main>
   );
 }
