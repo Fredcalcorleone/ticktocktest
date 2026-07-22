@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/utils/supabase';
 import Link from 'next/link';
-import Image from 'next/image'; // FIXED: Missing import added
+import Image from 'next/image';
 
 export default function AuthPortal() {
   const [showPassword, setShowPassword] = useState(false);
@@ -63,7 +63,6 @@ export default function AuthPortal() {
       
       {/* BRANDING HEADER */}
       <div className="text-center space-y-2 mb-6 flex flex-col items-center">
-        {/* FIXED: Scaled down from 300x300 to a standard clean size so it fits inside the view layout nicely */}
         <Image 
           src="/logo.svg" 
           alt="MindSprint Logo" 
@@ -92,7 +91,7 @@ export default function AuthPortal() {
               placeholder="enter username" 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="rounded-xl border-slate-200 text-xs font-medium h-10 bg-white"
+              className="rounded-xl border-slate-200 text-base md:text-xs font-medium h-10 bg-white"
               disabled={loading}
               required
             />
@@ -107,7 +106,8 @@ export default function AuthPortal() {
                 placeholder="••••••••" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="rounded-xl border-slate-200 text-xs font-medium h-10 pr-10 bg-white"
+
+                className="rounded-xl border-slate-200 text-base md:text-xs font-medium h-10 pr-10 bg-white"
                 disabled={loading}
                 required
               />
@@ -116,7 +116,7 @@ export default function AuthPortal() {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 text-slate-400 hover:text-slate-600"
                 disabled={loading}
-              >
+                >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
