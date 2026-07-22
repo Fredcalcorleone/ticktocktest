@@ -27,7 +27,7 @@ export function TopNav() {
         
         {/* BRAND LOGO USING logo.svg */}
         <Link href="/dashboard" className="flex items-center gap-2.5 group">
-          <div className="relative w-9 h-9 group-hover:scale-105 transition-transform">
+          <div className="relative w-14 h-14 group-hover:scale-105 transition-transform">
             <Image 
               src="/logo.svg" 
               alt="MindSprint Logo" 

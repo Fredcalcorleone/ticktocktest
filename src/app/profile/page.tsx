@@ -1,11 +1,18 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from '@/utils/supabase';
-import { User, GraduationCap, BarChart3, ShieldCheck, ArrowLeft, Award, Trophy, Zap, LineChart, X, Flame, ArrowUpRight } from 'lucide-react';
+import { 
+  User, GraduationCap, BarChart3, ShieldCheck, ArrowLeft, Award, Trophy, 
+  LineChart, X, Flame, ArrowUpRight, Camera, Save, KeyRound, CheckCircle2, 
+  AlertCircle, Loader2 
+} from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 interface ProgressTelemetryRow {
@@ -23,8 +30,20 @@ interface LeaderboardUser {
 }
 
 export default function ProfilePage() {
+  // Account & Form States
   const [username, setUsername] = useState<string>('');
+  const [newUsername, setNewUsername] = useState<string>('');
+  const [newPassword, setNewPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Status & Loader States
   const [loading, setLoading] = useState<boolean>(true);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [savingPass, setSavingPass] = useState<boolean>(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Analytics & Leaderboard States
   const [chartData, setChartData] = useState<{ name: string; score: number }[]>([]);
   const [showLeaderboard, setShowLeaderboard] = useState<boolean>(false);
   const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardUser[]>([]);
@@ -48,11 +67,17 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const cachedUser = localStorage.getItem('mindsprint_user');
+    const cachedAvatar = localStorage.getItem('mindsprint_avatar');
+
     if (!cachedUser) {
       window.location.href = '/';
       return;
     }
+    
     setUsername(cachedUser);
+    setNewUsername(cachedUser);
+    if (cachedAvatar) setProfileImage(cachedAvatar);
+
     fetchProfileAndLeaderboard(cachedUser);
 
     const isDark = localStorage.getItem('theme') === 'dark';
@@ -126,13 +151,104 @@ export default function ProfilePage() {
     }
   };
 
+  // Upload Avatar to Supabase Storage ('avatars' bucket)
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setStatusMessage({ type: 'error', text: 'Image size must be less than 2MB.' });
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setStatusMessage(null);
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${username.toLowerCase()}_${Date.now()}.${fileExt}`;
+      const filePath = `profiles/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const avatarPublicUrl = publicUrlData.publicUrl;
+
+      setProfileImage(avatarPublicUrl);
+      localStorage.setItem('mindsprint_avatar', avatarPublicUrl);
+      setStatusMessage({ type: 'success', text: 'Profile picture uploaded to Supabase Storage!' });
+    } catch (err: any) {
+      console.error("Storage upload error:", err);
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to upload image.' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Update Display Username
+  const handleUpdateUsername = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUsername.trim()) {
+      setStatusMessage({ type: 'error', text: 'Username cannot be empty.' });
+      return;
+    }
+
+    localStorage.setItem('mindsprint_user', newUsername.trim());
+    setUsername(newUsername.trim());
+    setStatusMessage({ type: 'success', text: 'Username updated successfully!' });
+  };
+
+  // Change Password via Supabase Auth
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatusMessage(null);
+
+    if (!newPassword || !confirmPassword) {
+      setStatusMessage({ type: 'error', text: 'Please fill in all password fields.' });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setStatusMessage({ type: 'error', text: 'New password must be at least 6 characters long.' });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setStatusMessage({ type: 'error', text: 'New passwords do not match.' });
+      return;
+    }
+
+    setSavingPass(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+
+      setNewPassword('');
+      setConfirmPassword('');
+      setStatusMessage({ type: 'success', text: 'Password successfully updated in Supabase Auth!' });
+    } catch (err: any) {
+      console.error("Password update error:", err);
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to update password.' });
+    } finally {
+      setSavingPass(false);
+    }
+  };
+
   const userRankPosition = globalLeaderboard.findIndex(u => u.username === username) + 1;
   const promotionMeta = getNextTierRequirements(stats.rank, stats.totalTests);
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 transition-colors duration-200 antialiased p-6">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 transition-colors duration-200 antialiased p-4 md:p-6 pb-24 md:pb-12">
       <div className="max-w-4xl mx-auto space-y-6">
         
+        {/* Top Navigation */}
         <div className="flex items-center justify-between">
           <Link href="/dashboard">
             <Button variant="ghost" className="text-slate-600 dark:text-slate-400 gap-1.5 text-xs font-bold font-mono hover:bg-slate-100 dark:hover:bg-slate-900 rounded-full cursor-pointer">
@@ -144,18 +260,57 @@ export default function ProfilePage() {
           </span>
         </div>
 
-        <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-3xl p-8 relative overflow-hidden shadow-xl border border-slate-800/20">
+        {/* Global Feedback Alert */}
+        {statusMessage && (
+          <div className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold ${
+            statusMessage.type === 'success' 
+              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+              : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+          }`}>
+            {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+            <span>{statusMessage.text}</span>
+          </div>
+        )}
+
+        {/* PROFILE HERO HEADER */}
+        <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 md:p-8 relative overflow-hidden shadow-xl border border-slate-800/20">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
+            
             <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="w-20 h-20 bg-indigo-600 border-4 border-slate-800 rounded-2xl flex items-center justify-center shadow-inner">
-                <GraduationCap className="w-10 h-10 text-white" />
+              {/* Profile Avatar Upload Container */}
+              <div className="relative group">
+                <div className="w-20 h-20 bg-indigo-600 border-4 border-slate-800 rounded-2xl flex items-center justify-center shadow-inner overflow-hidden relative">
+                  {uploading ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : profileImage ? (
+                    <Image src={profileImage} alt="Profile Avatar" fill className="object-cover" />
+                  ) : (
+                    <GraduationCap className="w-10 h-10 text-white" />
+                  )}
+                </div>
+
+                <label 
+                  htmlFor="hero-avatar-upload" 
+                  className="absolute -bottom-1 -right-1 bg-indigo-500 hover:bg-indigo-400 text-white p-1.5 rounded-xl cursor-pointer shadow-md transition-transform hover:scale-110"
+                  title="Upload profile image"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                </label>
+                <input 
+                  id="hero-avatar-upload" 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleImageUpload} 
+                  disabled={uploading}
+                />
               </div>
 
               <div className="space-y-1.5 text-center sm:text-left">
                 <h2 className="text-2xl font-black tracking-tight font-sans">@{username}</h2>
                 <button
                   onClick={() => setShowLeaderboard(true)}
-                  className="group px-3 py-1 bg-indigo-500/20 hover:bg-indigo-500/40 border border-indigo-400/30 text-indigo-300 text-xs font-mono font-bold uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="group px-3 py-1 bg-indigo-500/20 hover:bg-indigo-500/40 border border-indigo-400/30 text-indigo-300 text-xs font-mono font-bold uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 cursor-pointer mx-auto sm:mx-0"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
                   League Rank: <span className="text-white underline">{loading ? 'Loading...' : stats.rank}</span>
@@ -180,6 +335,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* METRICS & TELEMETRY */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="md:col-span-1 border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-2xl">
             <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
@@ -221,7 +377,7 @@ export default function ProfilePage() {
           </Card>
         </div>
 
-        {/* CHART TRACKER */}
+        {/* PERFORMANCE CHART */}
         <Card className="w-full border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden">
           <CardHeader className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center gap-2">
             <LineChart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
@@ -234,7 +390,7 @@ export default function ProfilePage() {
               <div className="h-64 flex items-center justify-center text-xs text-slate-400 font-mono">Compiling analytics...</div>
             ) : chartData.length === 0 ? (
               <div className="h-64 flex flex-col items-center justify-center text-center">
-                <p className="text-xs font-bold text-slate-500">No data found.</p>
+                <p className="text-xs font-bold text-slate-500">No telemetry log lines detected.</p>
               </div>
             ) : (
               <div className="w-full h-64 pr-4">
@@ -258,7 +414,86 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* OVERLAY MODAL */}
+        {/* EDIT USERNAME & EDIT PASSWORD FORMS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* Edit Username */}
+          <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden">
+            <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
+                <User className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Account Handle
+              </CardTitle>
+              <CardDescription className="text-xs">Update your display username across MindSprint.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-5">
+              <form onSubmit={handleUpdateUsername} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username" className="text-xs font-bold text-slate-700 dark:text-slate-300">Display Username</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    placeholder="Enter username"
+                    className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500"
+                  />
+                </div>
+                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 rounded-xl gap-1.5 shadow-sm cursor-pointer w-full">
+                  <Save className="w-3.5 h-3.5" /> Save Username
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Change Password */}
+          <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden">
+            <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Security Credentials
+              </CardTitle>
+              <CardDescription className="text-xs">Update your password via Supabase Auth.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-5">
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-pass" className="text-xs font-bold text-slate-700 dark:text-slate-300">New Password</Label>
+                  <Input
+                    id="new-pass"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Minimum 6 characters"
+                    className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-pass" className="text-xs font-bold text-slate-700 dark:text-slate-300">Confirm Password</Label>
+                  <Input
+                    id="confirm-pass"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repeat new password"
+                    className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500"
+                  />
+                </div>
+
+                <Button 
+                  type="submit" 
+                  disabled={savingPass}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 rounded-xl gap-1.5 shadow-sm cursor-pointer w-full"
+                >
+                  {savingPass ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
+                  {savingPass ? 'Updating...' : 'Update Password'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+        </div>
+
+        {/* GLOBAL LEADERBOARD OVERLAY MODAL */}
         {showLeaderboard && (
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <Card className="w-full max-w-xl border-slate-200 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900 rounded-3xl max-h-[80vh] flex flex-col overflow-hidden">
@@ -267,7 +502,7 @@ export default function ProfilePage() {
                   <Trophy className="w-4 h-4 text-amber-500" />
                   <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100">Global Sprint Rankings</CardTitle>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setShowLeaderboard(false)} className="w-8 h-8 rounded-full">
+                <Button variant="ghost" size="icon" onClick={() => setShowLeaderboard(false)} className="w-8 h-8 rounded-full cursor-pointer">
                   <X className="w-4 h-4" />
                 </Button>
               </CardHeader>
