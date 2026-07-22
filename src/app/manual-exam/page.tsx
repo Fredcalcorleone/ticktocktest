@@ -46,7 +46,7 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 p-6 transition-colors duration-200">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 p-4 md:p-6 transition-colors duration-200">
       <main className="max-w-6xl mx-auto space-y-6">
         
         {/* Page Header */}
@@ -56,13 +56,13 @@ export default function HistoryPage() {
           </div>
           <div>
             <h1 className="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Assessment History</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Review all your previous quiz evaluations and downloaded study material attachments.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Review all your previous quiz evaluations and study material attachments across all devices.</p>
           </div>
         </div>
 
-        {/* LOG DATA TABLE VIEW */}
+        {/* LOG DATA TABLE VIEW (Visible on both Mobile App & Desktop) */}
         <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden">
-          <CardHeader className="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
+          <CardHeader className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight">
               Evaluation Records
             </CardTitle>
@@ -77,33 +77,33 @@ export default function HistoryPage() {
                 <p className="text-[11px] text-slate-400 dark:text-slate-500 max-w-xs mx-auto">Complete your first quiz session to log results here.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left border-collapse min-w-[600px]">
                   <thead>
                     <tr className="bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 text-[10px] font-mono font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider">
-                      <th className="py-3 px-6">Module / Topic Identifier</th>
-                      <th className="py-3 px-6">Acquired Grade</th>
-                      <th className="py-3 px-6">Execution Mark Status</th>
-                      <th className="py-3 px-6 text-center">Attachment</th>
-                      <th className="py-3 px-6 text-right">Committed Timestamp</th>
+                      <th className="py-3 px-4 md:px-6">Module / Topic Identifier</th>
+                      <th className="py-3 px-4 md:px-6">Acquired Grade</th>
+                      <th className="py-3 px-4 md:px-6">Execution Mark Status</th>
+                      <th className="py-3 px-4 md:px-6 text-center">Attachment</th>
+                      <th className="py-3 px-4 md:px-6 text-right">Committed Timestamp</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
                     {progressData.map((row) => (
                       <tr key={row.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-800/20 transition-colors">
-                        <td className="py-3.5 px-6 font-bold text-slate-900 dark:text-slate-100">{row.module_name}</td>
-                        <td className="py-3.5 px-6">
+                        <td className="py-3.5 px-4 md:px-6 font-bold text-slate-900 dark:text-slate-100">{row.module_name}</td>
+                        <td className="py-3.5 px-4 md:px-6">
                           <span className={`font-mono font-bold ${row.score >= 70 ? 'text-emerald-600' : 'text-indigo-600 dark:text-indigo-400'}`}>
                             {row.score}%
                           </span>
                         </td>
-                        <td className="py-3.5 px-6">
+                        <td className="py-3.5 px-4 md:px-6">
                           <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md">
                             <CheckCircle2 className="w-3 h-3" /> {row.status || 'completed'}
                           </span>
                         </td>
                         
-                        <td className="py-3.5 px-6 text-center">
+                        <td className="py-3.5 px-4 md:px-6 text-center">
                           {row.pdf_url ? (
                             <a 
                               href={row.pdf_url} 
@@ -119,7 +119,7 @@ export default function HistoryPage() {
                           )}
                         </td>
 
-                        <td className="py-3.5 px-6 text-right text-slate-400 dark:text-slate-500 font-mono text-[11px]">
+                        <td className="py-3.5 px-4 md:px-6 text-right text-slate-400 dark:text-slate-500 font-mono text-[11px]">
                           <span className="inline-flex items-center gap-1 justify-end">
                             <Clock className="w-3 h-3" /> {new Date(row.updated_at).toLocaleDateString()}
                           </span>
