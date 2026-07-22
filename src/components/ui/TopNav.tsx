@@ -2,9 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Sun, Moon, LogOut } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Sun, Moon, LogOut, User } from 'lucide-react';
 
 export function TopNav() {
+  const pathname = usePathname();
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   useEffect(() => {
@@ -12,6 +14,10 @@ export function TopNav() {
     setIsDarkMode(isDark);
     if (isDark) document.documentElement.classList.add('dark');
   }, []);
+
+  // Do not display TopNav on login ('/' or '/login') and signup ('/signup') pages
+  const isAuthPage = pathname === '/' || pathname === '/login' || pathname === '/signup';
+  if (isAuthPage) return null;
 
   const toggleDarkMode = () => {
     const nextDark = !isDarkMode;
@@ -47,6 +53,7 @@ export function TopNav() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-3">
+          {/* Theme Toggle Button */}
           <button
             onClick={toggleDarkMode}
             className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
@@ -55,6 +62,17 @@ export function TopNav() {
             {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
           </button>
 
+          {/* Profile Navigation Button */}
+          <Link
+            href="/profile"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer"
+            title="View Profile"
+          >
+            <User className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span>Profile</span>
+          </Link>
+
+          {/* Sign Out Button */}
           <button
             onClick={handleSignOut}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-all cursor-pointer"

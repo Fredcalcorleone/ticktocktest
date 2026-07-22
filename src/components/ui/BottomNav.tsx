@@ -8,6 +8,10 @@ import { Home, Target, Brain, History, User } from 'lucide-react';
 export function BottomNav() {
   const pathname = usePathname();
 
+  // Hide Bottom Navigation on Auth / Landing pages
+  const isAuthPage = pathname === '/' || pathname === '/login' || pathname === '/signup';
+  if (isAuthPage) return null;
+
   const navItems = [
     { name: 'Home', href: '/dashboard', icon: Home },
     { name: 'Goals', href: '/course', icon: Target },
@@ -19,7 +23,7 @@ export function BottomNav() {
   return (
     /* md:hidden ensures this ONLY appears on mobile screen sizes (< 768px) */
     <div className="fixed bottom-6 inset-x-0 mx-auto w-[90%] max-w-md z-50 pointer-events-auto md:hidden">
-      <div className="bg-white/80 backdrop-blur-xl border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.08)] rounded-full px-4 py-2 flex items-center justify-between">
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 shadow-[0_10px_30px_rgba(0,0,0,0.08)] rounded-full px-4 py-2 flex items-center justify-between transition-colors">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
@@ -27,7 +31,7 @@ export function BottomNav() {
           if (item.primary) {
             return (
               <Link key={item.name} href={item.href} className="relative -top-2">
-                <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 hover:scale-105 transition-transform">
+                <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 hover:scale-105 transition-transform">
                   <Icon className="w-6 h-6" />
                 </div>
               </Link>
@@ -39,7 +43,9 @@ export function BottomNav() {
               key={item.name}
               href={item.href}
               className={`flex flex-col items-center justify-center py-1 px-3 rounded-2xl transition-all ${
-                isActive ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600'
+                isActive 
+                  ? 'text-indigo-600 dark:text-indigo-400 font-bold' 
+                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
               }`}
             >
               <Icon className="w-5 h-5" />
