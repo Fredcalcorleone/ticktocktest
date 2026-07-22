@@ -36,9 +36,7 @@ export function TopNav() {
               priority
             />
           </div>
-          <span className="font-black text-lg tracking-tight text-slate-900 dark:text-slate-100">
-            Mind<span className="text-indigo-600 dark:text-indigo-400">Sprint</span>
-          </span>
+          
         </Link>
 
         {/* NAVIGATION LINKS */}
