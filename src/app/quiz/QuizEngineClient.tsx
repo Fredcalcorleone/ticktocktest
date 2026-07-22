@@ -8,7 +8,7 @@ import { supabase } from '@/utils/supabase';
 import { UploadCloud, FileText, ArrowLeft, BookOpen, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { MobilePdfBar } from '@/components/ui/MobilePdfBar';
+import { usePdfBar } from '@/app/context/PdfBarContext';
 
 interface GeneratedQuestion {
   id: number;
@@ -21,6 +21,8 @@ interface GeneratedQuestion {
 
 export function QuizEngineClient() {
   const router = useRouter();
+  const { showPdfBar, hidePdfBar } = usePdfBar();
+
   const [username, setUsername] = useState('');
   const [sessionLimit, setSessionLimit] = useState<number>(10);
   const [file, setFile] = useState<File | null>(null);
@@ -67,6 +69,7 @@ export function QuizEngineClient() {
 
   const confirmExitAction = () => {
     setShowExitModal(false);
+    hidePdfBar();
     router.push(pendingTargetUrl || '/dashboard');
   };
 
@@ -202,10 +205,21 @@ export function QuizEngineClient() {
     if (index === aiQuestions[currentQuestionIndex].answerIndex) {
       setScore((prev) => prev + 1);
     }
+
+    // Trigger the global PDF bar on option selection
+    const currentQ = aiQuestions[currentQuestionIndex];
+    showPdfBar({
+      pageNumber: currentQ?.pageNumber,
+      fileUrl: fileUrl,
+      referenceQuote: currentQ?.referenceQuote,
+      label: "Source Context",
+    });
   };
 
   const handleNextQuestion = async () => {
     setSelectedOption(null);
+    hidePdfBar(); // Hide bar between questions until next pick
+    
     if (currentQuestionIndex + 1 < aiQuestions.length) {
       setCurrentQuestionIndex((prev) => prev + 1);
     } else {
@@ -384,20 +398,11 @@ export function QuizEngineClient() {
             <p className="text-[10px] text-emerald-600 font-mono font-bold mt-1">({score} / {aiQuestions.length} Correct)</p>
           </div>
           <div className="flex gap-3 max-w-sm mx-auto pt-2">
-            <Button onClick={() => { setQuizStarted(false); setQuizFinished(false); setCurrentQuestionIndex(0); setSelectedOption(null); setScore(0); setAiQuestions([]); }} className="w-1/2 bg-white border border-slate-200 text-slate-600 font-bold text-xs h-10 rounded-xl cursor-pointer">Test New File</Button>
+            <Button onClick={() => { setQuizStarted(false); setQuizFinished(false); setCurrentQuestionIndex(0); setSelectedOption(null); setScore(0); setAiQuestions([]); hidePdfBar(); }} className="w-1/2 bg-white border border-slate-200 text-slate-600 font-bold text-xs h-10 rounded-xl cursor-pointer">Test New File</Button>
             <Button onClick={() => handleProtectedExit('/dashboard')} className="w-1/2 bg-indigo-600 text-white font-bold text-xs h-10 rounded-xl cursor-pointer">Go to Dashboard</Button>
           </div>
         </Card>
       )}
-
-      {/* Global Reusable Mobile Bottom Quick-Access Bar */}
-      <MobilePdfBar 
-        isVisible={selectedOption !== null && !quizFinished}
-        pageNumber={aiQuestions[currentQuestionIndex]?.pageNumber}
-        fileUrl={fileUrl}
-        referenceQuote={aiQuestions[currentQuestionIndex]?.referenceQuote}
-        label="Source Context"
-      />
     </main>
   );
 }
