@@ -428,7 +428,7 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="md:col-span-1 border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-2xl">
             <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono">Competitor Metrics</CardTitle>
+              <CardTitle className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono">Global standing</CardTitle>
             </CardHeader>
             <CardContent className="p-5 space-y-4 text-xs font-medium text-slate-700 dark:text-slate-300">
               <div className="space-y-1">
@@ -442,7 +442,7 @@ export default function ProfilePage() {
 
           <Card className="md:col-span-2 border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-2xl">
             <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono">Supabase Telemetry Aggregates</CardTitle>
+              <CardTitle className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest font-mono">Achievements</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid grid-cols-3 gap-4 text-center">
@@ -511,9 +511,8 @@ export default function ProfilePage() {
             <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
                 {isDarkMode ? <Moon className="w-4 h-4 text-indigo-400" /> : <Sun className="w-4 h-4 text-amber-500" />}
-                Appearance & Theme
+                Theme
               </CardTitle>
-              <CardDescription className="text-xs">Customize how MindSprint looks on your device.</CardDescription>
             </CardHeader>
             <CardContent className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
