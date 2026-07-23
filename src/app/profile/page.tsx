@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +14,6 @@ import {
   LineChart, X, Flame, ArrowUpRight, Camera, Save, KeyRound, CheckCircle2, 
   AlertCircle, Loader2 
 } from 'lucide-react';
-import Link from 'next/link';
-import Image from 'next/image';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 interface ProgressTelemetryRow {
@@ -30,6 +31,8 @@ interface LeaderboardUser {
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
+
   // Account & Form States
   const [username, setUsername] = useState<string>('');
   const [newUsername, setNewUsername] = useState<string>('');
@@ -70,7 +73,7 @@ export default function ProfilePage() {
     const cachedAvatar = localStorage.getItem('mindsprint_avatar');
 
     if (!cachedUser) {
-      window.location.href = '/';
+      router.push('/');
       return;
     }
     
@@ -82,7 +85,7 @@ export default function ProfilePage() {
 
     const isDark = localStorage.getItem('theme') === 'dark';
     if (isDark) document.documentElement.classList.add('dark');
-  }, []);
+  }, [router]);
 
   const fetchProfileAndLeaderboard = async (userKey: string) => {
     try {
@@ -144,14 +147,13 @@ export default function ProfilePage() {
           })));
         }
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error generating leaderboard tiers:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Upload Avatar to Supabase Storage ('avatars' bucket) - Option B (Auth UUID Restricted)
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -165,26 +167,22 @@ export default function ProfilePage() {
       setUploading(true);
       setStatusMessage(null);
 
-      // 1. Get authenticated user ID from Supabase
       const { data: { user }, error: userError } = await supabase.auth.getUser();
 
       if (userError || !user) {
         throw new Error('User session not found. Please log in again.');
       }
 
-      // 2. Build file path using the user UUID
       const fileExt = file.name.split('.').pop();
       const fileName = `avatar_${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
 
-      // 3. Upload file to 'avatars' bucket
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // 4. Retrieve public URL
       const { data: publicUrlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
@@ -194,28 +192,28 @@ export default function ProfilePage() {
       setProfileImage(avatarPublicUrl);
       localStorage.setItem('mindsprint_avatar', avatarPublicUrl);
       setStatusMessage({ type: 'success', text: 'Profile picture uploaded to Supabase Storage!' });
-    } catch (err: any) {
-      console.error("Storage upload error:", err);
-      setStatusMessage({ type: 'error', text: err.message || 'Failed to upload image.' });
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Storage upload error:", error);
+      setStatusMessage({ type: 'error', text: error.message || 'Failed to upload image.' });
     } finally {
       setUploading(false);
     }
   };
 
-  // Update Display Username
   const handleUpdateUsername = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUsername.trim()) {
+    const trimmedUsername = newUsername.trim();
+    if (!trimmedUsername) {
       setStatusMessage({ type: 'error', text: 'Username cannot be empty.' });
       return;
     }
 
-    localStorage.setItem('mindsprint_user', newUsername.trim());
-    setUsername(newUsername.trim());
+    localStorage.setItem('mindsprint_user', trimmedUsername);
+    setUsername(trimmedUsername);
     setStatusMessage({ type: 'success', text: 'Username updated successfully!' });
   };
 
-  // Change Password via Supabase Auth
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
@@ -243,15 +241,17 @@ export default function ProfilePage() {
       setNewPassword('');
       setConfirmPassword('');
       setStatusMessage({ type: 'success', text: 'Password successfully updated in Supabase Auth!' });
-    } catch (err: any) {
-      console.error("Password update error:", err);
-      setStatusMessage({ type: 'error', text: err.message || 'Failed to update password.' });
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Password update error:", error);
+      setStatusMessage({ type: 'error', text: error.message || 'Failed to update password.' });
     } finally {
       setSavingPass(false);
     }
   };
 
-  const userRankPosition = globalLeaderboard.findIndex(u => u.username === username) + 1;
+  const userRankIndex = globalLeaderboard.findIndex(u => u.username === username);
+  const userRankPosition = userRankIndex !== -1 ? userRankIndex + 1 : '-';
   const promotionMeta = getNextTierRequirements(stats.rank, stats.totalTests);
 
   return (
@@ -319,6 +319,7 @@ export default function ProfilePage() {
               <div className="space-y-1.5 text-center sm:text-left">
                 <h2 className="text-2xl font-black tracking-tight font-sans">@{username}</h2>
                 <button
+                  type="button"
                   onClick={() => setShowLeaderboard(true)}
                   className="group px-3 py-1 bg-indigo-500/20 hover:bg-indigo-500/40 border border-indigo-400/30 text-indigo-300 text-xs font-mono font-bold uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5 cursor-pointer mx-auto sm:mx-0"
                 >
@@ -403,7 +404,7 @@ export default function ProfilePage() {
                 <p className="text-xs font-bold text-slate-500">No telemetry log lines detected.</p>
               </div>
             ) : (
-              <div className="w-full h-64 pr-4">
+              <div className="w-full h-64 pr-4 min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
                     <defs>
