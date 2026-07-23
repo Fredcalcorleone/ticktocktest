@@ -13,38 +13,39 @@ import Image from 'next/image';
 export default function AuthPortal() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [emailOrUsername, setEmailOrUsername] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const cleanIdentifier = emailOrUsername.trim().toLowerCase();
+    const cleanUsername = username.trim();
     const cleanPassword = password;
 
-    if (!cleanIdentifier || !cleanPassword) {
-      alert("Please enter both your email/username and password.");
+    if (!cleanUsername || !cleanPassword) {
+      alert("Please enter both your username and password.");
       return;
     }
 
     try {
       setLoading(true);
 
-      // If the user inputs a plain username instead of an email, format or resolve it
-      let authEmail = cleanIdentifier;
-      if (!cleanIdentifier.includes('@')) {
-        // Option A: If your Supabase Auth emails follow a fixed pattern:
-        authEmail = `${cleanIdentifier}@mindsprint.com`; 
-        
-        // Option B: Or fetch the corresponding email from your app_users table:
-        // const { data: userData } = await supabase.from('app_users').select('email').eq('username', cleanIdentifier).single();
-        // if (userData?.email) authEmail = userData.email;
+      // 1. Fetch the user's email directly from your database table using their username
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles') // Replace with your table name if different (e.g., 'users' or 'app_users')
+        .select('email')
+        .eq('username', cleanUsername)
+        .maybeSingle();
+
+      if (profileError || !userProfile?.email) {
+        alert("Authentication failed: Username not found.");
+        return;
       }
 
-      // 1. Establish native Supabase Auth Session
+      // 2. Establish native Supabase Auth Session using the retrieved email
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: authEmail,
+        email: userProfile.email,
         password: cleanPassword,
       });
 
@@ -53,11 +54,10 @@ export default function AuthPortal() {
         return;
       }
 
-      // 2. Save display username locally for UI components
-      const displayUser = data.user?.user_metadata?.username || cleanIdentifier.split('@')[0];
-      localStorage.setItem('mindsprint_user', displayUser);
+      // 3. Save active display username locally
+      localStorage.setItem('mindsprint_user', cleanUsername);
 
-      // 3. Navigate cleanly using Next Router
+      // 4. Navigate to dashboard
       router.push('/dashboard');
 
     } catch (err: unknown) {
@@ -94,23 +94,23 @@ export default function AuthPortal() {
         </div>
 
         <form className="space-y-4" onSubmit={handleSignIn}>
-          {/* USERNAME / EMAIL FIELD */}
+          {/* USERNAME FIELD */}
           <div className="space-y-1">
             <label className="text-[10px] font-bold font-mono tracking-wider text-slate-400 uppercase">
-              Username or Email
+              Username
             </label>
             <Input 
               type="text" 
-              placeholder="enter username or email" 
-              value={emailOrUsername}
-              onChange={(e) => setEmailOrUsername(e.target.value)}
+              placeholder="Enter your username" 
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="rounded-xl border-slate-200 text-base md:text-xs font-medium h-10 bg-white"
               disabled={loading}
               required
             />
           </div>
 
-          {/* SECURITY PASS ACCESS KEY */}
+          {/* PASSWORD FIELD */}
           <div className="space-y-1">
             <label className="text-[10px] font-bold font-mono tracking-wider text-slate-400 uppercase">
               Password
