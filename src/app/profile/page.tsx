@@ -36,6 +36,7 @@ export default function ProfilePage() {
   // Account & Form States
   const [username, setUsername] = useState<string>('');
   const [newUsername, setNewUsername] = useState<string>('');
+  const [currentPassword, setCurrentPassword] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -267,7 +268,7 @@ export default function ProfilePage() {
     e.preventDefault();
     setStatusMessage(null);
 
-    if (!newPassword || !confirmPassword) {
+    if (!currentPassword || !newPassword || !confirmPassword) {
       setStatusMessage({ type: 'error', text: 'Please fill in all password fields.' });
       return;
     }
@@ -282,18 +283,49 @@ export default function ProfilePage() {
       return;
     }
 
+    if (currentPassword === newPassword) {
+      setStatusMessage({ type: 'error', text: 'New password cannot be the same as the current password.' });
+      return;
+    }
+
     setSavingPass(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
+      // 1. Fetch current user from session
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
 
+      if (userError || !user) {
+        throw new Error('User authentication session not found. Please log in again.');
+      }
+
+      // 2. Re-authenticate using the old password to verify ownership
+      if (user.email) {
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: currentPassword,
+        });
+
+        if (authError) {
+          throw new Error('Current password is incorrect.');
+        }
+      }
+
+      // 3. Update to the new password in Supabase Auth
+      const { error: updateError } = await supabase.auth.updateUser({ 
+        password: newPassword 
+      });
+
+      if (updateError) throw updateError;
+
+      // 4. Clear all inputs on success
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setStatusMessage({ type: 'success', text: 'Password successfully updated!' });
+      setStatusMessage({ type: 'success', text: 'Password updated successfully!' });
+
     } catch (err: unknown) {
       const error = err as Error;
       console.error("Password update error:", error);
-      setStatusMessage({ type: 'error', text: error.message || 'Failed to update password. Make sure you are authenticated via Supabase Auth.' });
+      setStatusMessage({ type: 'error', text: error.message || 'Failed to update password.' });
     } finally {
       setSavingPass(false);
     }
@@ -510,18 +542,37 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Change Password */}
+          {/* Security Credentials Card */}
           <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden">
             <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Security Credentials
               </CardTitle>
-              <CardDescription className="text-xs">Update your password via Supabase Auth.</CardDescription>
+              <CardDescription className="text-xs">Verify your current password to set a new one.</CardDescription>
             </CardHeader>
             <CardContent className="p-5">
               <form onSubmit={handleChangePassword} className="space-y-4">
+                
+                {/* Current Password Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="new-pass" className="text-xs font-bold text-slate-700 dark:text-slate-300">New Password</Label>
+                  <Label htmlFor="current-pass" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Current Password
+                  </Label>
+                  <Input
+                    id="current-pass"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                    className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500"
+                  />
+                </div>
+
+                {/* New Password Field */}
+                <div className="space-y-2">
+                  <Label htmlFor="new-pass" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    New Password
+                  </Label>
                   <Input
                     id="new-pass"
                     type="password"
@@ -532,8 +583,11 @@ export default function ProfilePage() {
                   />
                 </div>
 
+                {/* Confirm New Password Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-pass" className="text-xs font-bold text-slate-700 dark:text-slate-300">Confirm Password</Label>
+                  <Label htmlFor="confirm-pass" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Confirm New Password
+                  </Label>
                   <Input
                     id="confirm-pass"
                     type="password"
