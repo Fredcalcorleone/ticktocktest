@@ -34,7 +34,7 @@ export default function AuthPortal() {
       // 1. Query `app_users` table directly for matching username AND password_hash
       const { data: user, error: dbError } = await supabase
         .from('app_users')
-        .select('id, username, name, role')
+        .select('id, username, name, role, avatar_url')
         .eq('username', cleanUsername)
         .eq('password_hash', cleanPassword)
         .maybeSingle();
@@ -49,10 +49,13 @@ export default function AuthPortal() {
         return;
       }
 
-      // 2. Save active session details locally
+      // 2. Save active session details locally for MindSprint state
       localStorage.setItem('mindsprint_user', user.username);
       if (user.name) {
         localStorage.setItem('mindsprint_user_fullname', user.name);
+      }
+      if (user.avatar_url) {
+        localStorage.setItem('mindsprint_avatar', user.avatar_url);
       }
 
       // 3. Navigate directly to dashboard
@@ -126,7 +129,7 @@ export default function AuthPortal() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 text-slate-400 hover:text-slate-600 cursor-pointer"
                 disabled={loading}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -140,7 +143,7 @@ export default function AuthPortal() {
               <Button 
                 type="button"
                 disabled={loading}
-                className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs h-10 rounded-xl shadow-none"
+                className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs h-10 rounded-xl shadow-none cursor-pointer"
               >
                 Sign Up +
               </Button>

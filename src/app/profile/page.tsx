@@ -12,7 +12,7 @@ import { supabase } from '@/utils/supabase';
 import { 
   User, GraduationCap, BarChart3, ShieldCheck, ArrowLeft, Award, Trophy, 
   LineChart, X, Flame, ArrowUpRight, Camera, Save, KeyRound, CheckCircle2, 
-  AlertCircle, Loader2 
+  AlertCircle, Loader2, Eye, EyeOff 
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -40,6 +40,11 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Password Visibility States
+  const [showCurrentPassword, setShowCurrentPassword] = useState<boolean>(false);
+  const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
   // Status & Loader States
   const [loading, setLoading] = useState<boolean>(true);
@@ -264,6 +269,7 @@ export default function ProfilePage() {
     }
   };
 
+  // FIXED CHANGE PASSWORD HANDLER targeting app_users table
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
@@ -290,33 +296,34 @@ export default function ProfilePage() {
 
     setSavingPass(true);
     try {
-      // 1. Fetch current user from session
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const activeUser = username || localStorage.getItem('mindsprint_user');
 
-      if (userError || !user) {
-        throw new Error('User authentication session not found. Please log in again.');
+      if (!activeUser) {
+        throw new Error('User session not found. Please sign in again.');
       }
 
-      // 2. Re-authenticate using the old password to verify ownership
-      if (user.email) {
-        const { error: authError } = await supabase.auth.signInWithPassword({
-          email: user.email,
-          password: currentPassword,
-        });
+      // 1. Verify current password matches password_hash in app_users
+      const { data: user, error: fetchErr } = await supabase
+        .from('app_users')
+        .select('id')
+        .eq('username', activeUser)
+        .eq('password_hash', currentPassword.trim())
+        .maybeSingle();
 
-        if (authError) {
-          throw new Error('Current password is incorrect.');
-        }
+      if (fetchErr) throw fetchErr;
+
+      if (!user) {
+        throw new Error('Current password is incorrect.');
       }
 
-      // 3. Update to the new password in Supabase Auth
-      const { error: updateError } = await supabase.auth.updateUser({ 
-        password: newPassword 
-      });
+      // 2. Update password_hash in app_users
+      const { error: updateErr } = await supabase
+        .from('app_users')
+        .update({ password_hash: newPassword.trim() })
+        .eq('username', activeUser);
 
-      if (updateError) throw updateError;
+      if (updateErr) throw updateErr;
 
-      // 4. Clear all inputs on success
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -558,14 +565,24 @@ export default function ProfilePage() {
                   <Label htmlFor="current-pass" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                     Current Password
                   </Label>
-                  <Input
-                    id="current-pass"
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password"
-                    className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500"
-                  />
+                  <div className="relative flex items-center">
+                    <Input
+                      id="current-pass"
+                      type={showCurrentPassword ? "text" : "password"}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Enter current password"
+                      className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword((prev) => !prev)}
+                      className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                      title={showCurrentPassword ? "Hide password" : "Show password"}
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 {/* New Password Field */}
@@ -573,14 +590,24 @@ export default function ProfilePage() {
                   <Label htmlFor="new-pass" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                     New Password
                   </Label>
-                  <Input
-                    id="new-pass"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Minimum 6 characters"
-                    className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500"
-                  />
+                  <div className="relative flex items-center">
+                    <Input
+                      id="new-pass"
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Minimum 6 characters"
+                      className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword((prev) => !prev)}
+                      className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                      title={showNewPassword ? "Hide password" : "Show password"}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Confirm New Password Field */}
@@ -588,14 +615,24 @@ export default function ProfilePage() {
                   <Label htmlFor="confirm-pass" className="text-xs font-bold text-slate-700 dark:text-slate-300">
                     Confirm New Password
                   </Label>
-                  <Input
-                    id="confirm-pass"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repeat new password"
-                    className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500"
-                  />
+                  <div className="relative flex items-center">
+                    <Input
+                      id="confirm-pass"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repeat new password"
+                      className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                      title={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <Button 
@@ -652,4 +689,4 @@ export default function ProfilePage() {
       </div>
     </div>
   );
-}
+}   
