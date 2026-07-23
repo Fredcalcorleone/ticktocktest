@@ -82,7 +82,7 @@ export default function StudentDashboard() {
             <div className="pt-6">
               <Link href="/quiz">
                 <Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-10 rounded-xl shadow-md shadow-indigo-900/30 gap-1.5 transition-all cursor-pointer">
-                  <BrainCircuit className="w-4 h-4" /> Open Dynamic AI Quiz Engine <ArrowRight className="w-3.5 h-3.5" />
+                  <BrainCircuit className="w-4 h-4" /> Generate Quiz from your notes<ArrowRight className="w-3.5 h-3.5" />
                 </Button>
               </Link>
             </div>
@@ -94,7 +94,7 @@ export default function StudentDashboard() {
               <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center">
                 <BarChart3 className="w-4 h-4" />
               </div>
-              <span className="text-[15px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Performance Telemetry</span>
+              <span className="text-[15px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Performance</span>
             </div>
             
             <div className="grid grid-cols-2 gap-4 my-auto py-2">

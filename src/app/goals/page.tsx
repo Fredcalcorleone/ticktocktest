@@ -192,9 +192,7 @@ export default function GoalsPage() {
               <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
             </Button>
           </Link>
-          <span className="text-[10px] bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 font-mono font-bold px-2.5 py-0.5 rounded-full select-none flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-amber-500" /> System Verified Progress
-          </span>
+          
         </div>
 
         {/* STREAK HEADER */}
@@ -283,7 +281,7 @@ export default function GoalsPage() {
         <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden">
           <CardHeader className="p-6 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="text-base font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Automated Campaign Missions
+              <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />Missions
             </CardTitle>
             <CardDescription className="text-xs">Missions complete automatically when your system stats meet the requirements.</CardDescription>
           </CardHeader>

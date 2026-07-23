@@ -272,7 +272,7 @@ export function QuizEngineClient() {
         <Button variant="ghost" onClick={() => handleProtectedExit('/dashboard')} className="text-xs font-bold text-slate-500 hover:text-slate-800 gap-1 rounded-xl h-8 cursor-pointer">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
         </Button>
-        <Badge variant="outline" className="border-indigo-100 bg-indigo-50/50 text-indigo-700 font-mono font-bold px-2.5 py-0.5 text-[10px] rounded-lg">@{username} Gemini Engine</Badge>
+        <Badge variant="outline" className="border-indigo-100 bg-indigo-50/50 text-indigo-700 font-mono font-bold px-2.5 py-0.5 text-[10px] rounded-lg">Powered by Gemini Engine</Badge>
       </div>
 
       {!quizStarted && !quizFinished && (
@@ -282,7 +282,7 @@ export function QuizEngineClient() {
               <Image src="/logo.svg" alt="MindSprint Logo" width={24} height={24} className="object-contain" priority />
             </div>
             <div>
-              <CardTitle className="text-sm font-black text-slate-900 tracking-tight">AI Assessment Creator</CardTitle>
+              <CardTitle className="text-sm font-black text-slate-900 tracking-tight">Question generator</CardTitle>
               <p className="text-[11px] text-slate-400 mt-0.5">Drop your reading material PDF. Gemini will deduce the topic matter and generate your session.</p>
             </div>
           </CardHeader>
