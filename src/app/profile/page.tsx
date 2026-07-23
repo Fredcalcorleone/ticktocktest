@@ -12,7 +12,7 @@ import { supabase } from '@/utils/supabase';
 import { 
   GraduationCap, BarChart3, ShieldCheck, ArrowLeft, Award, Trophy, 
   LineChart, X, Flame, ArrowUpRight, Camera, KeyRound, CheckCircle2, 
-  AlertCircle, Loader2, Eye, EyeOff, Sun, Moon 
+  AlertCircle, Loader2, Eye, EyeOff, Sun, Moon, LogOut 
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -52,6 +52,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [uploading, setUploading] = useState<boolean>(false);
   const [savingPass, setSavingPass] = useState<boolean>(false);
+  const [signingOut, setSigningOut] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Analytics & Leaderboard States
@@ -275,7 +276,7 @@ export default function ProfilePage() {
         throw new Error('User session not found. Please sign in again.');
       }
 
-      // 1. Verify current password matches password_hash in app_users
+      // Verify current password matches password_hash in app_users
       const { data: user, error: fetchErr } = await supabase
         .from('app_users')
         .select('id')
@@ -289,7 +290,7 @@ export default function ProfilePage() {
         throw new Error('Current password is incorrect.');
       }
 
-      // 2. Update password_hash in app_users
+      // Update password_hash in app_users
       const { error: updateErr } = await supabase
         .from('app_users')
         .update({ password_hash: newPassword.trim() })
@@ -308,6 +309,22 @@ export default function ProfilePage() {
       setStatusMessage({ type: 'error', text: error.message || 'Failed to update password.' });
     } finally {
       setSavingPass(false);
+    }
+  };
+
+  // Sign Out Handler
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      localStorage.removeItem('mindsprint_user');
+      localStorage.removeItem('mindsprint_avatar');
+      await supabase.auth.signOut().catch(() => {}); // Fallback signout
+      router.push('/');
+    } catch (err) {
+      console.error("Sign out error:", err);
+      router.push('/');
+    } finally {
+      setSigningOut(false);
     }
   };
 
@@ -627,6 +644,24 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
+        </div>
+
+        {/* BOTTOM SIGN OUT SECTION */}
+        <div className="pt-4 flex justify-center">
+          <Button
+            type="button"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            variant="outline"
+            className="w-full max-w-xs border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/50 font-bold text-xs h-11 rounded-2xl gap-2 shadow-sm cursor-pointer transition-colors"
+          >
+            {signingOut ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <LogOut className="w-4 h-4" />
+            )}
+            {signingOut ? 'Signing out...' : 'Sign Out of Account'}
+          </Button>
         </div>
 
         {/* GLOBAL LEADERBOARD OVERLAY MODAL */}
