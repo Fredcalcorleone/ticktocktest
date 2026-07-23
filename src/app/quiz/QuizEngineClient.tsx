@@ -206,7 +206,6 @@ export function QuizEngineClient() {
       setScore((prev) => prev + 1);
     }
 
-    // Trigger the global PDF bar on option selection
     const currentQ = aiQuestions[currentQuestionIndex];
     showPdfBar({
       pageNumber: currentQ?.pageNumber,
@@ -218,7 +217,7 @@ export function QuizEngineClient() {
 
   const handleNextQuestion = async () => {
     setSelectedOption(null);
-    hidePdfBar(); // Hide bar between questions until next pick
+    hidePdfBar();
     
     if (currentQuestionIndex + 1 < aiQuestions.length) {
       setCurrentQuestionIndex((prev) => prev + 1);
@@ -249,7 +248,7 @@ export function QuizEngineClient() {
   };
 
   return (
-    <main className="p-6 max-w-3xl mx-auto space-y-6 antialiased relative">
+    <main className="min-h-screen w-full overflow-y-auto p-4 md:p-6 pb-32 max-w-3xl mx-auto space-y-6 antialiased relative">
       {showExitModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
           <Card className="w-full max-w-sm border-slate-200 shadow-2xl bg-white rounded-2xl p-6 text-center space-y-4">
@@ -322,7 +321,7 @@ export function QuizEngineClient() {
       )}
 
       {quizStarted && !quizFinished && (
-        <Card className="border-slate-200/80 shadow-xl bg-white rounded-3xl p-6 space-y-6">
+        <Card className="border-slate-200/80 shadow-xl bg-white rounded-3xl p-6 space-y-6 max-h-[80vh] overflow-y-auto">
           <div className="flex justify-between items-center pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2 text-slate-500 max-w-[70%]"><span className="text-[10px] font-mono font-bold uppercase tracking-tight text-indigo-600 truncate">📖 Subject: {detectedTitle}</span></div>
             <div className="flex gap-3 text-[10px] font-mono font-bold shrink-0"><span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded">{currentQuestionIndex + 1} of {aiQuestions.length}</span><span className="text-emerald-600">Correct: {score}</span></div>
