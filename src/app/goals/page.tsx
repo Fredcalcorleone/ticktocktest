@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { supabase } from '@/utils/supabase';
 import { 
   Flame, ArrowLeft, Trophy, CheckCircle2, Circle, Award, 
-  Target, Zap, Star, ShieldCheck, Sparkles, CalendarCheck 
+  Target, Zap, Star, ShieldCheck, Sparkles, CalendarCheck, Loader2 
 } from 'lucide-react';
 
 interface Mission {
@@ -20,21 +21,21 @@ interface Mission {
 }
 
 const INITIAL_MISSIONS: Mission[] = [
-  // Bronze Tier (Missions 1 - 5)
+  // Bronze Tier
   { id: 1, title: 'First Steps', description: 'Complete your first practice module or test run.', xp: 100, category: 'Bronze', completed: false },
   { id: 2, title: 'Identity Confirmed', description: 'Upload a custom profile photo in account settings.', xp: 50, category: 'Bronze', completed: false },
   { id: 3, title: 'Consistent Learner', description: 'Maintain a 3-day login streak.', xp: 150, category: 'Bronze', completed: false },
   { id: 4, title: 'Passing Grade', description: 'Score at least 70% on any quiz or evaluation.', xp: 100, category: 'Bronze', completed: false },
   { id: 5, title: 'Handle Claimed', description: 'Set up your unique display username.', xp: 50, category: 'Bronze', completed: false },
 
-  // Elite Tier (Missions 6 - 10)
+  // Elite Tier
   { id: 6, title: 'High Performer', description: 'Score 85% or higher on 3 different modules.', xp: 250, category: 'Elite', completed: false },
   { id: 7, title: 'Streak Master', description: 'Keep your daily login streak active for 7 consecutive days.', xp: 300, category: 'Elite', completed: false },
   { id: 8, title: 'Sprint Competitor', description: 'Complete at least 5 total evaluation runs.', xp: 200, category: 'Elite', completed: false },
   { id: 9, title: 'Leaderboard Contender', description: 'Reach the Top 10 on the Global Leaderboard.', xp: 350, category: 'Elite', completed: false },
   { id: 10, title: 'Perfectionist', description: 'Achieve a perfect 100% score on any module.', xp: 300, category: 'Elite', completed: false },
 
-  // Grandmaster Tier (Missions 11 - 15)
+  // Grandmaster Tier
   { id: 11, title: 'Sprint Legend', description: 'Complete 15 total assessment runs.', xp: 500, category: 'Grandmaster', completed: false },
   { id: 12, title: 'Unstoppable Momentum', description: 'Reach a 14-day consecutive login streak.', xp: 600, category: 'Grandmaster', completed: false },
   { id: 13, title: 'Elite Mastery', description: 'Maintain an overall average score above 90%.', xp: 750, category: 'Grandmaster', completed: false },
@@ -43,44 +44,102 @@ const INITIAL_MISSIONS: Mission[] = [
 ];
 
 export default function GoalsPage() {
+  const [username, setUsername] = useState<string>('');
   const [streak, setStreak] = useState<number>(1);
   const [hasClaimedToday, setHasClaimedToday] = useState<boolean>(false);
+  const [loadingStreak, setLoadingStreak] = useState<boolean>(true);
   const [missions, setMissions] = useState<Mission[]>(INITIAL_MISSIONS);
 
   useEffect(() => {
-    // 1. Load Streak Data
-    const savedStreak = localStorage.getItem('mindsprint_streak');
-    const lastLogin = localStorage.getItem('mindsprint_last_login');
-    const today = new Date().toDateString();
-
-    if (savedStreak) setStreak(parseInt(savedStreak, 10));
-
-    if (lastLogin === today) {
-      setHasClaimedToday(true);
-    } else if (lastLogin) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      if (lastLogin !== yesterday.toDateString()) {
-        // Reset streak if missed a day
-        setStreak(1);
-        localStorage.setItem('mindsprint_streak', '1');
-      }
+    const user = localStorage.getItem('mindsprint_user');
+    if (user) {
+      setUsername(user);
+      fetchUserStreak(user);
     }
 
-    // 2. Load Missions Progress
+    // Load local mission checks
     const savedMissions = localStorage.getItem('mindsprint_missions');
-    if (savedMissions) {
-      setMissions(JSON.parse(savedMissions));
-    }
+    if (savedMissions) setMissions(JSON.parse(savedMissions));
   }, []);
 
-  const claimDailyStreak = () => {
-    const today = new Date().toDateString();
-    const newStreak = streak + 1;
-    setStreak(newStreak);
-    setHasClaimedToday(true);
-    localStorage.setItem('mindsprint_streak', newStreak.toString());
-    localStorage.setItem('mindsprint_last_login', today);
+  // Fetch or calculate streak from Supabase
+  const fetchUserStreak = async (userKey: string) => {
+    try {
+      setLoadingStreak(true);
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const { data, error } = await supabase
+        .from('user_streaks')
+        .select('current_streak, last_login_date')
+        .eq('username', userKey)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 means no row found yet, which is fine
+        console.error('Error fetching streak:', error);
+      }
+
+      if (data) {
+        const lastLogin = data.last_login_date;
+        const lastLoginDate = new Date(lastLogin);
+        const todayDate = new Date(todayStr);
+
+        // Difference in days
+        const diffTime = Math.abs(todayDate.getTime() - lastLoginDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (lastLogin === todayStr) {
+          // Already logged in/claimed today
+          setStreak(data.current_streak);
+          setHasClaimedToday(true);
+        } else if (diffDays === 1) {
+          // Consecutive day (yesterday)
+          setStreak(data.current_streak);
+          setHasClaimedToday(false);
+        } else {
+          // Missed 1+ days, reset streak to 1
+          setStreak(1);
+          setHasClaimedToday(false);
+        }
+      } else {
+        // New user record initialization
+        setStreak(1);
+        setHasClaimedToday(false);
+      }
+    } catch (err) {
+      console.error("Streak sync error:", err);
+    } finally {
+      setLoadingStreak(false);
+    }
+  };
+
+  const claimDailyStreak = async () => {
+    if (!username || hasClaimedToday) return;
+
+    try {
+      setLoadingStreak(true);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const newStreak = hasClaimedToday ? streak : streak + 1;
+
+      // Upsert into Supabase user_streaks table
+      const { error } = await supabase
+        .from('user_streaks')
+        .upsert({
+          username,
+          current_streak: newStreak,
+          last_login_date: todayStr,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      setStreak(newStreak);
+      setHasClaimedToday(true);
+    } catch (err) {
+      console.error("Failed to update streak:", err);
+    } finally {
+      setLoadingStreak(false);
+    }
   };
 
   const toggleMission = (id: number) => {
@@ -109,7 +168,7 @@ export default function GoalsPage() {
           </span>
         </div>
 
-        {/* TOP STREAK HEADER */}
+        {/* STREAK BANNER */}
         <Card className="border-none shadow-xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white rounded-3xl overflow-hidden relative">
           <CardContent className="p-6 md:p-8 relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-5 text-center md:text-left">
@@ -118,21 +177,25 @@ export default function GoalsPage() {
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-mono font-bold uppercase tracking-wider text-amber-100">Daily Login Streak</p>
-                <h1 className="text-3xl md:text-4xl font-black">{streak} {streak === 1 ? 'Day' : 'Days'} Active</h1>
+                <h1 className="text-3xl md:text-4xl font-black">
+                  {loadingStreak ? '...' : `${streak} ${streak === 1 ? 'Day' : 'Days'} Active`}
+                </h1>
                 <p className="text-xs text-amber-100/90 font-medium">Log in daily to claim bonus XP and level up faster!</p>
               </div>
             </div>
 
             <Button
               onClick={claimDailyStreak}
-              disabled={hasClaimedToday}
+              disabled={hasClaimedToday || loadingStreak}
               className={`font-black text-xs px-6 py-6 rounded-2xl shadow-lg transition-all cursor-pointer ${
                 hasClaimedToday 
                   ? 'bg-white/20 text-white border border-white/30 cursor-not-allowed' 
                   : 'bg-white text-orange-600 hover:bg-amber-50 hover:scale-105'
               }`}
             >
-              {hasClaimedToday ? (
+              {loadingStreak ? (
+                <Loader2 className="w-4 h-4 animate-spin text-orange-600" />
+              ) : hasClaimedToday ? (
                 <span className="flex items-center gap-2">
                   <CalendarCheck className="w-4 h-4" /> Streak Claimed Today!
                 </span>
@@ -145,7 +208,7 @@ export default function GoalsPage() {
           </CardContent>
         </Card>
 
-        {/* MISSION PROGRESS METRICS */}
+        {/* METRICS METERS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-2xl">
             <CardContent className="p-5 flex items-center gap-4">
@@ -187,7 +250,7 @@ export default function GoalsPage() {
           </Card>
         </div>
 
-        {/* 15 MISSIONS BOARD */}
+        {/* 15 MISSIONS */}
         <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden">
           <CardHeader className="p-6 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="text-base font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
