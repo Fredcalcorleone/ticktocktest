@@ -32,7 +32,7 @@ export function TopNav() {
 
   const navLinks = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Goals', href: '/course', icon: Target },
+    { name: 'Goals', href: '/goals', icon: Target },
     { name: 'Quiz Engine', href: '/quiz', icon: BrainCircuit },
     { name: 'History', href: '/manual-exam', icon: History },
     { name: 'Profile', href: '/profile', icon: User },

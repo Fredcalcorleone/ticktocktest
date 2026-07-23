@@ -14,7 +14,7 @@ export function BottomNav() {
 
   const navItems = [
     { name: 'Home', href: '/dashboard', icon: Home },
-    { name: 'Goals', href: '/course', icon: Target },
+    { name: 'Goals', href: '/goals', icon: Target },
     { name: 'Quiz', href: '/quiz', icon: Brain, primary: true },
     { name: 'History', href: '/manual-exam', icon: History },
     { name: 'Profile', href: '/profile', icon: User },
