@@ -21,7 +21,7 @@ export default function AuthPortal() {
     e.preventDefault();
     
     const cleanUsername = username.trim();
-    const cleanPassword = password;
+    const cleanPassword = password.trim();
 
     if (!cleanUsername || !cleanPassword) {
       alert("Please enter both your username and password.");
@@ -31,33 +31,31 @@ export default function AuthPortal() {
     try {
       setLoading(true);
 
-      // 1. Fetch the user's email directly from your database table using their username
-      const { data: userProfile, error: profileError } = await supabase
-        .from('profiles') // Replace with your table name if different (e.g., 'users' or 'app_users')
-        .select('email')
+      // 1. Query `app_users` table directly for matching username AND password_hash
+      const { data: user, error: dbError } = await supabase
+        .from('app_users')
+        .select('id, username, name, role')
         .eq('username', cleanUsername)
+        .eq('password_hash', cleanPassword)
         .maybeSingle();
 
-      if (profileError || !userProfile?.email) {
-        alert("Authentication failed: Username not found.");
+      if (dbError) {
+        alert(`Database error: ${dbError.message}`);
         return;
       }
 
-      // 2. Establish native Supabase Auth Session using the retrieved email
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: userProfile.email,
-        password: cleanPassword,
-      });
-
-      if (error) {
-        alert(`Authentication failed: ${error.message}`);
+      if (!user) {
+        alert("Authentication failed: Invalid username or password.");
         return;
       }
 
-      // 3. Save active display username locally
-      localStorage.setItem('mindsprint_user', cleanUsername);
+      // 2. Save active session details locally
+      localStorage.setItem('mindsprint_user', user.username);
+      if (user.name) {
+        localStorage.setItem('mindsprint_user_fullname', user.name);
+      }
 
-      // 4. Navigate to dashboard
+      // 3. Navigate directly to dashboard
       router.push('/dashboard');
 
     } catch (err: unknown) {
