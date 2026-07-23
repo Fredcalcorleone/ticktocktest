@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from '@/utils/supabase';
 import { 
-  User, GraduationCap, BarChart3, ShieldCheck, ArrowLeft, Award, Trophy, 
-  LineChart, X, Flame, ArrowUpRight, Camera, Save, KeyRound, CheckCircle2, 
-  AlertCircle, Loader2, Eye, EyeOff 
+  GraduationCap, BarChart3, ShieldCheck, ArrowLeft, Award, Trophy, 
+  LineChart, X, Flame, ArrowUpRight, Camera, KeyRound, CheckCircle2, 
+  AlertCircle, Loader2, Eye, EyeOff, Sun, Moon 
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -35,11 +35,13 @@ export default function ProfilePage() {
 
   // Account & Form States
   const [username, setUsername] = useState<string>('');
-  const [newUsername, setNewUsername] = useState<string>('');
   const [currentPassword, setCurrentPassword] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Theme State
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   // Password Visibility States
   const [showCurrentPassword, setShowCurrentPassword] = useState<boolean>(false);
@@ -49,7 +51,6 @@ export default function ProfilePage() {
   // Status & Loader States
   const [loading, setLoading] = useState<boolean>(true);
   const [uploading, setUploading] = useState<boolean>(false);
-  const [savingUsername, setSavingUsername] = useState<boolean>(false);
   const [savingPass, setSavingPass] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -165,14 +166,31 @@ export default function ProfilePage() {
     }
     
     setUsername(cachedUser);
-    setNewUsername(cachedUser);
     if (cachedAvatar) setProfileImage(cachedAvatar);
 
     fetchProfileAndLeaderboard(cachedUser);
 
+    // Dark Mode Theme Init
     const isDark = localStorage.getItem('theme') === 'dark';
-    if (isDark) document.documentElement.classList.add('dark');
+    setIsDarkMode(isDark);
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [router, fetchProfileAndLeaderboard]);
+
+  const toggleTheme = (mode: 'light' | 'dark') => {
+    const isDark = mode === 'dark';
+    setIsDarkMode(isDark);
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -225,51 +243,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleUpdateUsername = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmedUsername = newUsername.trim();
-    if (!trimmedUsername) {
-      setStatusMessage({ type: 'error', text: 'Username cannot be empty.' });
-      return;
-    }
-
-    if (trimmedUsername === username) return;
-
-    setSavingUsername(true);
-    setStatusMessage(null);
-
-    try {
-      // 1. Update username in app_users
-      const { error: dbError } = await supabase
-        .from('app_users')
-        .update({ username: trimmedUsername })
-        .eq('username', username);
-
-      if (dbError) throw dbError;
-
-      // 2. Cascade change to telemetry records (user_progress table)
-      const { error: progressError } = await supabase
-        .from('user_progress')
-        .update({ username: trimmedUsername })
-        .eq('username', username);
-
-      if (progressError) throw progressError;
-
-      localStorage.setItem('mindsprint_user', trimmedUsername);
-      setUsername(trimmedUsername);
-      setStatusMessage({ type: 'success', text: 'Username and telemetry logs updated successfully!' });
-      
-      // Refresh analytics for new key
-      fetchProfileAndLeaderboard(trimmedUsername);
-    } catch (err: unknown) {
-      const error = err as Error;
-      setStatusMessage({ type: 'error', text: error.message || 'Failed to update username.' });
-    } finally {
-      setSavingUsername(false);
-    }
-  };
-
-  // FIXED CHANGE PASSWORD HANDLER targeting app_users table
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage(null);
@@ -513,39 +486,46 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* EDIT USERNAME & EDIT PASSWORD FORMS */}
+        {/* APP THEME PREFERENCE & SECURITY CREDENTIALS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
-          {/* Edit Username */}
+          {/* App Theme (Light/Dark Mode Toggle) */}
           <Card className="border-slate-200/80 dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 rounded-3xl overflow-hidden">
             <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2">
-                <User className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Account Handle
+                {isDarkMode ? <Moon className="w-4 h-4 text-indigo-400" /> : <Sun className="w-4 h-4 text-amber-500" />}
+                Appearance & Theme
               </CardTitle>
-              <CardDescription className="text-xs">Update your display username across MindSprint.</CardDescription>
+              <CardDescription className="text-xs">Customize how MindSprint looks on your device.</CardDescription>
             </CardHeader>
-            <CardContent className="p-5">
-              <form onSubmit={handleUpdateUsername} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username" className="text-xs font-bold text-slate-700 dark:text-slate-300">Display Username</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    placeholder="Enter username"
-                    className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500"
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  disabled={savingUsername}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 rounded-xl gap-1.5 shadow-sm cursor-pointer w-full"
+            <CardContent className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleTheme('light')}
+                  className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+                    !isDarkMode 
+                      ? 'bg-indigo-50/80 border-indigo-500 text-indigo-900 shadow-sm' 
+                      : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
                 >
-                  {savingUsername ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                  {savingUsername ? 'Saving...' : 'Save Username'}
-                </Button>
-              </form>
+                  <Sun className={`w-5 h-5 ${!isDarkMode ? 'text-amber-500' : 'text-slate-400'}`} />
+                  <span>Light Mode</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => toggleTheme('dark')}
+                  className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+                    isDarkMode 
+                      ? 'bg-indigo-950/60 border-indigo-500 text-indigo-200 shadow-sm' 
+                      : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
+                >
+                  <Moon className={`w-5 h-5 ${isDarkMode ? 'text-indigo-400' : 'text-slate-400'}`} />
+                  <span>Dark Mode</span>
+                </button>
+              </div>
             </CardContent>
           </Card>
 
@@ -689,4 +669,4 @@ export default function ProfilePage() {
       </div>
     </div>
   );
-}   
+}
