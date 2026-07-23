@@ -91,6 +91,18 @@ export default function ProfilePage() {
     try {
       setLoading(true);
 
+      // Fetch user profile photo directly from DB if not cached locally
+      const { data: userData } = await supabase
+        .from('app_users')
+        .select('avatar_url')
+        .eq('username', userKey)
+        .single();
+
+      if (userData?.avatar_url) {
+        setProfileImage(userData.avatar_url);
+        localStorage.setItem('mindsprint_avatar', userData.avatar_url);
+      }
+
       const { data: allData, error: globalErr } = await supabase
         .from('user_progress')
         .select('username, score, module_name, updated_at');
@@ -167,33 +179,44 @@ export default function ProfilePage() {
       setUploading(true);
       setStatusMessage(null);
 
-      // Check Supabase Auth session first, fallback to cached username
-      const { data: { user } } = await supabase.auth.getUser();
-      const folderIdentifier = user?.id || username || 'default_user';
+      const currentUsername = username || localStorage.getItem('mindsprint_user');
 
-      if (!folderIdentifier) {
-        throw new Error('User identification not found. Please re-login.');
+      if (!currentUsername) {
+        throw new Error('User session not found. Please log in again.');
       }
 
+      // 1. Prepare file path inside storage bucket
       const fileExt = file.name.split('.').pop();
-      const fileName = `avatar_${Date.now()}.${fileExt}`;
-      const filePath = `${folderIdentifier}/${fileName}`;
+      const fileName = `${currentUsername}-avatar.${fileExt}`;
+      const filePath = `${fileName}`;
 
+      // 2. Upload file to Supabase Storage "avatars" bucket
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
+      // 3. Get public URL from storage
       const { data: publicUrlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
       const avatarPublicUrl = publicUrlData.publicUrl;
 
+      // 4. UPDATE DATABASE: Sync avatar_url into `app_users` table
+      const { error: dbError } = await supabase
+        .from('app_users')
+        .update({ avatar_url: avatarPublicUrl })
+        .eq('username', currentUsername);
+
+      if (dbError) throw dbError;
+
+      // 5. Update local state & cache
       setProfileImage(avatarPublicUrl);
       localStorage.setItem('mindsprint_avatar', avatarPublicUrl);
-      setStatusMessage({ type: 'success', text: 'Profile picture uploaded to Supabase Storage!' });
+      setStatusMessage({ type: 'success', text: 'Profile picture updated successfully in database!' });
+
     } catch (err: unknown) {
       const error = err as Error;
       console.error("Storage upload error:", error);
@@ -203,7 +226,7 @@ export default function ProfilePage() {
     }
   };
 
-  const handleUpdateUsername = (e: React.FormEvent) => {
+  const handleUpdateUsername = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedUsername = newUsername.trim();
     if (!trimmedUsername) {
@@ -211,9 +234,22 @@ export default function ProfilePage() {
       return;
     }
 
-    localStorage.setItem('mindsprint_user', trimmedUsername);
-    setUsername(trimmedUsername);
-    setStatusMessage({ type: 'success', text: 'Username updated successfully!' });
+    try {
+      // Sync database record
+      const { error: dbError } = await supabase
+        .from('app_users')
+        .update({ username: trimmedUsername })
+        .eq('username', username);
+
+      if (dbError) throw dbError;
+
+      localStorage.setItem('mindsprint_user', trimmedUsername);
+      setUsername(trimmedUsername);
+      setStatusMessage({ type: 'success', text: 'Username updated successfully!' });
+    } catch (err: unknown) {
+      const error = err as Error;
+      setStatusMessage({ type: 'error', text: error.message || 'Failed to update username.' });
+    }
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
