@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -43,6 +43,7 @@ export default function ProfilePage() {
   // Status & Loader States
   const [loading, setLoading] = useState<boolean>(true);
   const [uploading, setUploading] = useState<boolean>(false);
+  const [savingUsername, setSavingUsername] = useState<boolean>(false);
   const [savingPass, setSavingPass] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -68,41 +69,23 @@ export default function ProfilePage() {
     return { next: 'MAX RANK REACHED', par: 5, remaining: 0 };
   };
 
-  useEffect(() => {
-    const cachedUser = localStorage.getItem('mindsprint_user');
-    const cachedAvatar = localStorage.getItem('mindsprint_avatar');
-
-    if (!cachedUser) {
-      router.push('/');
-      return;
-    }
-    
-    setUsername(cachedUser);
-    setNewUsername(cachedUser);
-    if (cachedAvatar) setProfileImage(cachedAvatar);
-
-    fetchProfileAndLeaderboard(cachedUser);
-
-    const isDark = localStorage.getItem('theme') === 'dark';
-    if (isDark) document.documentElement.classList.add('dark');
-  }, [router]);
-
-  const fetchProfileAndLeaderboard = async (userKey: string) => {
+  const fetchProfileAndLeaderboard = useCallback(async (userKey: string) => {
     try {
       setLoading(true);
 
-      // Fetch user profile photo directly from DB if not cached locally
+      // Fetch avatar from DB
       const { data: userData } = await supabase
         .from('app_users')
         .select('avatar_url')
         .eq('username', userKey)
-        .single();
+        .maybeSingle();
 
       if (userData?.avatar_url) {
         setProfileImage(userData.avatar_url);
         localStorage.setItem('mindsprint_avatar', userData.avatar_url);
       }
 
+      // Fetch telemetry details
       const { data: allData, error: globalErr } = await supabase
         .from('user_progress')
         .select('username, score, module_name, updated_at');
@@ -111,8 +94,8 @@ export default function ProfilePage() {
 
       if (allData) {
         const globalRows = allData as ProgressTelemetryRow[];
+        const userGroups: Record<string, number[]> = {};
 
-        const userGroups: { [key: string]: number[] } = {};
         globalRows.forEach(row => {
           if (!userGroups[row.username]) userGroups[row.username] = [];
           userGroups[row.username].push(row.score);
@@ -164,7 +147,26 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const cachedUser = localStorage.getItem('mindsprint_user');
+    const cachedAvatar = localStorage.getItem('mindsprint_avatar');
+
+    if (!cachedUser) {
+      router.push('/');
+      return;
+    }
+    
+    setUsername(cachedUser);
+    setNewUsername(cachedUser);
+    if (cachedAvatar) setProfileImage(cachedAvatar);
+
+    fetchProfileAndLeaderboard(cachedUser);
+
+    const isDark = localStorage.getItem('theme') === 'dark';
+    if (isDark) document.documentElement.classList.add('dark');
+  }, [router, fetchProfileAndLeaderboard]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -180,31 +182,23 @@ export default function ProfilePage() {
       setStatusMessage(null);
 
       const currentUsername = username || localStorage.getItem('mindsprint_user');
+      if (!currentUsername) throw new Error('User session not found. Please log in again.');
 
-      if (!currentUsername) {
-        throw new Error('User session not found. Please log in again.');
-      }
-
-      // 1. Prepare file path inside storage bucket
       const fileExt = file.name.split('.').pop();
-      const fileName = `${currentUsername}-avatar.${fileExt}`;
-      const filePath = `${fileName}`;
+      const fileName = `${currentUsername}-${Date.now()}.${fileExt}`;
 
-      // 2. Upload file to Supabase Storage "avatars" bucket
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // 3. Get public URL from storage
       const { data: publicUrlData } = supabase.storage
         .from('avatars')
-        .getPublicUrl(filePath);
+        .getPublicUrl(fileName);
 
       const avatarPublicUrl = publicUrlData.publicUrl;
 
-      // 4. UPDATE DATABASE: Sync avatar_url into `app_users` table
       const { error: dbError } = await supabase
         .from('app_users')
         .update({ avatar_url: avatarPublicUrl })
@@ -212,10 +206,9 @@ export default function ProfilePage() {
 
       if (dbError) throw dbError;
 
-      // 5. Update local state & cache
       setProfileImage(avatarPublicUrl);
       localStorage.setItem('mindsprint_avatar', avatarPublicUrl);
-      setStatusMessage({ type: 'success', text: 'Profile picture updated successfully in database!' });
+      setStatusMessage({ type: 'success', text: 'Profile picture updated successfully!' });
 
     } catch (err: unknown) {
       const error = err as Error;
@@ -234,8 +227,13 @@ export default function ProfilePage() {
       return;
     }
 
+    if (trimmedUsername === username) return;
+
+    setSavingUsername(true);
+    setStatusMessage(null);
+
     try {
-      // Sync database record
+      // 1. Update username in app_users
       const { error: dbError } = await supabase
         .from('app_users')
         .update({ username: trimmedUsername })
@@ -243,12 +241,25 @@ export default function ProfilePage() {
 
       if (dbError) throw dbError;
 
+      // 2. Cascade change to telemetry records (user_progress table)
+      const { error: progressError } = await supabase
+        .from('user_progress')
+        .update({ username: trimmedUsername })
+        .eq('username', username);
+
+      if (progressError) throw progressError;
+
       localStorage.setItem('mindsprint_user', trimmedUsername);
       setUsername(trimmedUsername);
-      setStatusMessage({ type: 'success', text: 'Username updated successfully!' });
+      setStatusMessage({ type: 'success', text: 'Username and telemetry logs updated successfully!' });
+      
+      // Refresh analytics for new key
+      fetchProfileAndLeaderboard(trimmedUsername);
     } catch (err: unknown) {
       const error = err as Error;
       setStatusMessage({ type: 'error', text: error.message || 'Failed to update username.' });
+    } finally {
+      setSavingUsername(false);
     }
   };
 
@@ -278,11 +289,11 @@ export default function ProfilePage() {
 
       setNewPassword('');
       setConfirmPassword('');
-      setStatusMessage({ type: 'success', text: 'Password successfully updated in Supabase Auth!' });
+      setStatusMessage({ type: 'success', text: 'Password successfully updated!' });
     } catch (err: unknown) {
       const error = err as Error;
       console.error("Password update error:", error);
-      setStatusMessage({ type: 'error', text: error.message || 'Failed to update password.' });
+      setStatusMessage({ type: 'error', text: error.message || 'Failed to update password. Make sure you are authenticated via Supabase Auth.' });
     } finally {
       setSavingPass(false);
     }
@@ -487,8 +498,13 @@ export default function ProfilePage() {
                     className="rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-semibold focus-visible:ring-indigo-500"
                   />
                 </div>
-                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 rounded-xl gap-1.5 shadow-sm cursor-pointer w-full">
-                  <Save className="w-3.5 h-3.5" /> Save Username
+                <Button 
+                  type="submit" 
+                  disabled={savingUsername}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 rounded-xl gap-1.5 shadow-sm cursor-pointer w-full"
+                >
+                  {savingUsername ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  {savingUsername ? 'Saving...' : 'Save Username'}
                 </Button>
               </form>
             </CardContent>
