@@ -6,53 +6,64 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/utils/supabase';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 
 export default function AuthPortal() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [username, setUsername] = useState('');
+  const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const cleanUsername = username.trim().toLowerCase();
+    const cleanIdentifier = emailOrUsername.trim().toLowerCase();
     const cleanPassword = password;
 
-    if (!cleanUsername || !cleanPassword) {
-      alert("Please enter both your username and security code access key.");
+    if (!cleanIdentifier || !cleanPassword) {
+      alert("Please enter both your email/username and password.");
       return;
     }
 
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from('app_users')
-        .select('*')
-        .eq('username', cleanUsername)
-        .single();
+      // If the user inputs a plain username instead of an email, format or resolve it
+      let authEmail = cleanIdentifier;
+      if (!cleanIdentifier.includes('@')) {
+        // Option A: If your Supabase Auth emails follow a fixed pattern:
+        authEmail = `${cleanIdentifier}@mindsprint.com`; 
+        
+        // Option B: Or fetch the corresponding email from your app_users table:
+        // const { data: userData } = await supabase.from('app_users').select('email').eq('username', cleanIdentifier).single();
+        // if (userData?.email) authEmail = userData.email;
+      }
 
-      if (error || !data) {
-        alert("Invalid username identifier credentials.");
-        setLoading(false);
+      // 1. Establish native Supabase Auth Session
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: cleanPassword,
+      });
+
+      if (error) {
+        alert(`Authentication failed: ${error.message}`);
         return;
       }
 
-      if (data.password_hash !== cleanPassword) {
-        alert("Invalid password credential lock match.");
-        setLoading(false);
-        return;
-      }
+      // 2. Save display username locally for UI components
+      const displayUser = data.user?.user_metadata?.username || cleanIdentifier.split('@')[0];
+      localStorage.setItem('mindsprint_user', displayUser);
 
-      localStorage.setItem('mindsprint_user', cleanUsername);
-      window.location.href = `${window.location.origin}/dashboard`;
+      // 3. Navigate cleanly using Next Router
+      router.push('/dashboard');
 
-    } catch (err: any) {
-      console.error("Authentication interaction error:", err);
-      alert(`System Error: ${err.message || err}`);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Authentication interaction error:", error);
+      alert(`System Error: ${error.message || error}`);
     } finally {
       setLoading(false);
     }
@@ -83,14 +94,16 @@ export default function AuthPortal() {
         </div>
 
         <form className="space-y-4" onSubmit={handleSignIn}>
-          {/* USERNAME FIELD */}
+          {/* USERNAME / EMAIL FIELD */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold font-mono tracking-wider text-slate-400 uppercase">Username</label>
+            <label className="text-[10px] font-bold font-mono tracking-wider text-slate-400 uppercase">
+              Username or Email
+            </label>
             <Input 
               type="text" 
-              placeholder="enter username" 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              placeholder="enter username or email" 
+              value={emailOrUsername}
+              onChange={(e) => setEmailOrUsername(e.target.value)}
               className="rounded-xl border-slate-200 text-base md:text-xs font-medium h-10 bg-white"
               disabled={loading}
               required
@@ -99,14 +112,15 @@ export default function AuthPortal() {
 
           {/* SECURITY PASS ACCESS KEY */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold font-mono tracking-wider text-slate-400 uppercase">Password</label>
+            <label className="text-[10px] font-bold font-mono tracking-wider text-slate-400 uppercase">
+              Password
+            </label>
             <div className="relative flex items-center">
               <Input 
                 type={showPassword ? "text" : "password"} 
                 placeholder="••••••••" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-
                 className="rounded-xl border-slate-200 text-base md:text-xs font-medium h-10 pr-10 bg-white"
                 disabled={loading}
                 required
@@ -116,7 +130,7 @@ export default function AuthPortal() {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 text-slate-400 hover:text-slate-600"
                 disabled={loading}
-                >
+              >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -137,7 +151,7 @@ export default function AuthPortal() {
             <Button 
               type="submit" 
               disabled={loading}
-              className="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 rounded-xl shadow-sm"
+              className="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 rounded-xl shadow-sm cursor-pointer"
             >
               {loading ? "Verifying..." : "Sign In →"}
             </Button>

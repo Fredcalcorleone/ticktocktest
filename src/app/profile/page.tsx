@@ -167,15 +167,17 @@ export default function ProfilePage() {
       setUploading(true);
       setStatusMessage(null);
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      // Check Supabase Auth session first, fallback to cached username
+      const { data: { user } } = await supabase.auth.getUser();
+      const folderIdentifier = user?.id || username || 'default_user';
 
-      if (userError || !user) {
-        throw new Error('User session not found. Please log in again.');
+      if (!folderIdentifier) {
+        throw new Error('User identification not found. Please re-login.');
       }
 
       const fileExt = file.name.split('.').pop();
       const fileName = `avatar_${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
+      const filePath = `${folderIdentifier}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
